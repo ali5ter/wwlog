@@ -1,0 +1,5 @@
+{
+  "line-length": { "line_length": 120, "code_block_line_length": 120 },
+  "no-inline-html": false,
+  "MD060": false
+}
