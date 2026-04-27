@@ -3,6 +3,7 @@ package tui
 import (
 	"fmt"
 	"strings"
+	"time"
 
 	"github.com/ali5ter/wwlog/internal/api"
 	"github.com/charmbracelet/bubbles/list"
@@ -13,19 +14,20 @@ import (
 
 // logModel is the food log tab — a date list on the left, meal detail on the right.
 type logModel struct {
-	list     list.Model
-	detail   viewport.Model
-	logs     []*api.DayLog
-	width    int
-	height   int
-	selected int
+	list        list.Model
+	detail      viewport.Model
+	logs        []*api.DayLog
+	width       int
+	height      int
+	selected    int
+	initialized bool
 }
 
 type dateItem struct {
 	log *api.DayLog
 }
 
-func (d dateItem) Title() string       { return d.log.Date }
+func (d dateItem) Title() string       { return formatDateShort(d.log.Date) }
 func (d dateItem) Description() string { return mealSummary(d.log) }
 func (d dateItem) FilterValue() string { return d.log.Date }
 
@@ -47,11 +49,12 @@ func newLogModel(logs []*api.DayLog, width, height int) logModel {
 	vp := viewport.New(detailWidth, height)
 
 	m := logModel{
-		list:   l,
-		detail: vp,
-		logs:   logs,
-		width:  width,
-		height: height,
+		list:        l,
+		detail:      vp,
+		logs:        logs,
+		width:       width,
+		height:      height,
+		initialized: true,
 	}
 	if len(logs) > 0 {
 		m.detail.SetContent(renderDay(logs[0]))
@@ -85,6 +88,9 @@ func (m logModel) view() string {
 }
 
 func (m *logModel) resize(width, height int) {
+	if !m.initialized {
+		return
+	}
 	m.width = width
 	m.height = height
 	listWidth := width / 3
@@ -95,11 +101,11 @@ func (m *logModel) resize(width, height int) {
 
 func renderDay(day *api.DayLog) string {
 	var b strings.Builder
-	fmt.Fprintf(&b, "%s\n\n", styleMealHeading.Render(day.Date))
-	renderMeal(&b, "Breakfast", day.Meals.Morning)
-	renderMeal(&b, "Lunch", day.Meals.Midday)
-	renderMeal(&b, "Dinner", day.Meals.Evening)
-	renderMeal(&b, "Snacks", day.Meals.Anytime)
+	fmt.Fprintf(&b, "%s\n\n", styleMealHeading.Render(formatDateLong(day.Date)))
+	renderMeal(&b, "☀  Breakfast", day.Meals.Morning)
+	renderMeal(&b, "☁  Lunch", day.Meals.Midday)
+	renderMeal(&b, "🌙  Dinner", day.Meals.Evening)
+	renderMeal(&b, "🍎  Snacks", day.Meals.Anytime)
 	return b.String()
 }
 
@@ -111,7 +117,7 @@ func renderMeal(b *strings.Builder, name string, entries []api.FoodEntry) {
 	for _, e := range entries {
 		portion := ""
 		if e.PortionName != "" {
-			portion = styleFoodPortion.Render(fmt.Sprintf("  %.4g %s", e.PortionSize, e.PortionName))
+			portion = styleFoodPortion.Render(fmt.Sprintf("  %s %s", formatPortion(e.PortionSize), e.PortionName))
 		}
 		fmt.Fprintf(b, "  %s%s\n", styleFoodItem.Render(e.Name), portion)
 	}
@@ -119,7 +125,32 @@ func renderMeal(b *strings.Builder, name string, entries []api.FoodEntry) {
 }
 
 func mealSummary(day *api.DayLog) string {
-	total := len(day.Meals.Morning) + len(day.Meals.Midday) +
-		len(day.Meals.Evening) + len(day.Meals.Anytime)
-	return fmt.Sprintf("%d items logged", total)
+	b := len(day.Meals.Morning)
+	l := len(day.Meals.Midday)
+	d := len(day.Meals.Evening)
+	s := len(day.Meals.Anytime)
+	return fmt.Sprintf("☀ %d  ☁ %d  🌙 %d  🍎 %d", b, l, d, s)
+}
+
+func formatDateShort(date string) string {
+	t, err := time.Parse("2006-01-02", date)
+	if err != nil {
+		return date
+	}
+	return t.Format("Mon, 2 Jan")
+}
+
+func formatDateLong(date string) string {
+	t, err := time.Parse("2006-01-02", date)
+	if err != nil {
+		return date
+	}
+	return t.Format("Monday 2 January 2006")
+}
+
+func formatPortion(size float64) string {
+	if size == float64(int(size)) {
+		return fmt.Sprintf("%g", size)
+	}
+	return fmt.Sprintf("%.1f", size)
 }

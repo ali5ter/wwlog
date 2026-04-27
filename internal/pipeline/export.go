@@ -14,7 +14,35 @@ import (
 
 // EmitJSON writes all day logs as a JSON array to stdout.
 func EmitJSON(logs []*api.DayLog) error {
-	return json.NewEncoder(os.Stdout).Encode(logs)
+	return WriteJSON(os.Stdout, logs)
+}
+
+// WriteJSON encodes logs as a JSON array to w.
+func WriteJSON(w io.Writer, logs []*api.DayLog) error {
+	return json.NewEncoder(w).Encode(logs)
+}
+
+// WriteLogCSV writes a simple CSV of food log entries (no nutrition) to w.
+func WriteLogCSV(w io.Writer, logs []*api.DayLog) error {
+	cw := csv.NewWriter(w)
+	_ = cw.Write([]string{"Date", "Meal", "Food", "Portion", "Unit"})
+	for _, day := range logs {
+		for meal, entries := range map[string][]api.FoodEntry{
+			"Breakfast": day.Meals.Morning,
+			"Lunch":     day.Meals.Midday,
+			"Dinner":    day.Meals.Evening,
+			"Snacks":    day.Meals.Anytime,
+		} {
+			for _, e := range entries {
+				_ = cw.Write([]string{
+					day.Date, meal, e.Name,
+					fmt.Sprintf("%g", e.PortionSize), e.PortionName,
+				})
+			}
+		}
+	}
+	cw.Flush()
+	return cw.Error()
 }
 
 // EmitMarkdown writes a Markdown food log report to w.

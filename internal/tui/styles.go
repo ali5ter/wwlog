@@ -88,4 +88,26 @@ var (
 
 	styleDim = lipgloss.NewStyle().
 			Foreground(colorLine)
+
+	// Splash screen styles
+	styleSplashLogo = lipgloss.NewStyle().
+			Foreground(colorTeal).
+			Bold(true)
+
+	styleSplashTitle = lipgloss.NewStyle().
+				Foreground(colorText).
+				Bold(true)
+
+	styleSplashSub = lipgloss.NewStyle().
+			Foreground(colorSteel)
+
+	styleSplashFormTitle = lipgloss.NewStyle().
+				Foreground(colorTeal).
+				Bold(true)
+
+	styleSplashHint = lipgloss.NewStyle().
+			Foreground(colorMuted)
+
+	styleSplashInputPrompt = lipgloss.NewStyle().
+				Foreground(colorPurple)
 )

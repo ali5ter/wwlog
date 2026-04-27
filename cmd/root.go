@@ -12,6 +12,7 @@ import (
 	"github.com/ali5ter/wwlog/internal/pipeline"
 	"github.com/ali5ter/wwlog/internal/tui"
 	"github.com/spf13/cobra"
+	"golang.org/x/term"
 )
 
 var (
@@ -41,9 +42,8 @@ func Execute() {
 }
 
 func init() {
-	today := time.Now().Format("2006-01-02")
-	rootCmd.Flags().StringVarP(&flagStart, "start", "s", today, "Start date (YYYY-MM-DD)")
-	rootCmd.Flags().StringVarP(&flagEnd, "end", "e", today, "End date (YYYY-MM-DD)")
+	rootCmd.Flags().StringVarP(&flagStart, "start", "s", "", "Start date (YYYY-MM-DD, default: last 7 days)")
+	rootCmd.Flags().StringVarP(&flagEnd, "end", "e", "", "End date (YYYY-MM-DD, default: today)")
 	rootCmd.Flags().BoolVarP(&flagNutrition, "nutrition", "n", false, "Include nutritional data")
 	rootCmd.Flags().BoolVar(&flagJSON, "json", false, "Emit log as JSON to stdout")
 	rootCmd.Flags().BoolVar(&flagNoTTY, "no-tty", false, "Force pipeline mode even in a terminal")
@@ -82,36 +82,42 @@ func run(cmd *cobra.Command, _ []string) error {
 		if err != nil {
 			return fmt.Errorf("read password: %w", err)
 		}
-		if _, err := authenticator.Login(email, password); err != nil {
+		token, err := authenticator.Login(email, password)
+		if err != nil {
 			return fmt.Errorf("login: %w", err)
 		}
-		fmt.Fprintln(os.Stderr, "Authenticated and credentials stored.")
+		msg := "Authenticated and credentials stored."
+		if exp, err := authenticator.Expiry(token); err == nil {
+			msg += fmt.Sprintf(" Session expires %s.", exp.Local().Format("Mon 2 Jan 2006 at 15:04"))
+		}
+		fmt.Fprintln(os.Stderr, msg)
 		return nil
 	}
 
-	token, err := authenticator.Token()
-	if err != nil {
-		return fmt.Errorf("%w\nRun 'wwlog --login' to authenticate", err)
-	}
-
-	client := api.New(token, tld)
-
+	// Pipeline mode: requires explicit dates; defaults to today if omitted.
 	if flagJSON || flagNoTTY || !isTTY() {
-		logs, err := loadLogs(client, flagStart, flagEnd)
+		start := flagStart
+		if start == "" {
+			start = time.Now().Format("2006-01-02")
+		}
+		end := flagEnd
+		if end == "" {
+			end = time.Now().Format("2006-01-02")
+		}
+		token, err := authenticator.Token()
+		if err != nil {
+			return fmt.Errorf("%w\nRun 'wwlog --login' to authenticate", err)
+		}
+		client := api.New(token, tld)
+		logs, err := loadLogs(client, start, end)
 		if err != nil {
 			return err
 		}
 		return pipeline.EmitJSON(logs)
 	}
 
-	return tui.Run(
-		func() ([]*api.DayLog, error) { return loadLogs(client, flagStart, flagEnd) },
-		flagStart,
-		flagEnd,
-		flagNutrition,
-		client,
-		version,
-	)
+	// TUI mode: auth and date range handled inside the TUI.
+	return tui.Run(authenticator, tld, flagStart, flagEnd, flagNutrition, version)
 }
 
 func loadLogs(client *api.Client, start, end string) ([]*api.DayLog, error) {

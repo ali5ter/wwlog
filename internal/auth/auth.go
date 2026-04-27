@@ -65,6 +65,11 @@ func (a *Auth) Login(email, password string) (string, error) {
 	return token, nil
 }
 
+// Expiry returns the expiry time embedded in the given JWT.
+func (a *Auth) Expiry(token string) (time.Time, error) {
+	return expiry(token)
+}
+
 // Logout removes all stored credentials from the system keychain.
 func (a *Auth) Logout() error {
 	_ = keyring.Delete(serviceName, keyEmail)
