@@ -280,18 +280,8 @@ func renderMeal(b *strings.Builder, name string, entries []api.FoodEntry) {
 	fmt.Fprintln(b)
 }
 
-// entryPoints returns the best available points value for a food entry.
 func entryPoints(e api.FoodEntry) float64 {
-	if e.PointsInfo.MaxPoints != 0 {
-		return math.Round(e.PointsInfo.MaxPoints)
-	}
-	if e.PersonalPoints != 0 {
-		return math.Round(e.PersonalPoints)
-	}
-	if e.SmartPoints != 0 {
-		return math.Round(e.SmartPoints)
-	}
-	return math.Round(e.Points)
+	return math.Round(e.PointsPrecise)
 }
 
 func mealSummary(day *api.DayLog) string {

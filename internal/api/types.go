@@ -43,13 +43,15 @@ type FoodEntry struct {
 	TimeOfDay      string         `json:"timeOfDay"`
 	ServingDesc    string         `json:"_servingDesc"`
 	DefaultPortion DefaultPortion `json:"defaultPortion"`
-	PointsInfo     struct {
+	// PointsPrecise is the actual points charged to the budget for this entry.
+	// For ZeroPoint foods this is 0. Use this for all points calculations.
+	PointsPrecise float64 `json:"pointsPrecise"`
+	IsZPF         bool    `json:"isZPF"`
+	// PointsInfo.MaxPoints is the pre-ZPF calculated value. Only useful when
+	// you want to show "saved X points" for a ZPF food.
+	PointsInfo struct {
 		MaxPoints float64 `json:"maxPoints"`
 	} `json:"pointsInfo"`
-	// Legacy points fields — kept for older API responses.
-	Points         float64 `json:"pointsValue"`
-	PersonalPoints float64 `json:"personalPointsValue"`
-	SmartPoints    float64 `json:"smartPointsValue"`
 }
 
 // Nutrition computes scaled nutritional values for the tracked portion size.

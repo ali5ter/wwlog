@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"net/http"
+	"strings"
 	"time"
 )
 
@@ -78,7 +79,7 @@ func (c *Client) FetchDay(date string) (*DayLog, error) {
 			ActivityRemaining:        pd.ActivityRemaining,
 			VeggieServings:           pd.VeggieServings,
 			Weight:                   pd.Weight,
-			WeightUnit:               pd.WeightUnit,
+			WeightUnit:               strings.TrimSuffix(pd.WeightUnit, "s"),
 		},
 	}, nil
 }

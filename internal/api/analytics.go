@@ -1,7 +1,6 @@
 package api
 
 import (
-	"math"
 	"sort"
 	"strings"
 )
@@ -59,13 +58,9 @@ func TopFoods(logs []*DayLog, limit int) []FoodStat {
 				stat = &FoodStat{Name: e.Name}
 				acc[key] = stat
 			}
-			pts := e.PointsInfo.MaxPoints
-			if pts == 0 {
-				pts = e.PersonalPoints
-			}
 			nut := e.Nutrition()
 			stat.Count++
-			stat.TotalPts += math.Round(pts)
+			stat.TotalPts += e.PointsPrecise
 			stat.TotalCals += nut.Calories
 		}
 	}
@@ -107,11 +102,7 @@ func MealStats(logs []*DayLog) []MealStat {
 		}
 		for period, entries := range meals {
 			for _, e := range entries {
-				pts := e.PointsInfo.MaxPoints
-				if pts == 0 {
-					pts = e.PersonalPoints
-				}
-				totals[period].pts += math.Round(pts)
+				totals[period].pts += e.PointsPrecise
 				totals[period].cals += e.Nutrition().Calories
 			}
 		}

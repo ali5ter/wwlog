@@ -39,13 +39,9 @@ func WriteLogCSV(w io.Writer, logs []*api.DayLog) error {
 					serving = fmt.Sprintf("%g %s", e.PortionSize, e.PortionName)
 				}
 				n := e.Nutrition()
-				pts := e.PointsInfo.MaxPoints
-				if pts == 0 {
-					pts = e.PersonalPoints
-				}
 				_ = cw.Write([]string{
 					day.Date, meal, e.Name, serving,
-					fmt.Sprintf("%.0f", pts),
+					fmt.Sprintf("%.0f", e.PointsPrecise),
 					fmt.Sprintf("%.0f", n.Calories),
 					fmt.Sprintf("%.1f", n.Protein),
 					fmt.Sprintf("%.1f", n.Carbs),
@@ -88,17 +84,13 @@ func writeMealMD(w io.Writer, name string, entries []api.FoodEntry) {
 			serving = fmt.Sprintf("%.4g %s", e.PortionSize, e.PortionName)
 			serving = strings.TrimRight(serving, "0.")
 		}
-		pts := e.PointsInfo.MaxPoints
-		if pts == 0 {
-			pts = e.PersonalPoints
-		}
 		cal := e.Nutrition().Calories
 		meta := ""
 		if serving != "" {
 			meta += ", " + serving
 		}
-		if pts > 0 {
-			meta += fmt.Sprintf(", %.0fpt", pts)
+		if e.PointsPrecise > 0 {
+			meta += fmt.Sprintf(", %.0fpt", e.PointsPrecise)
 		}
 		if cal > 0 {
 			meta += fmt.Sprintf(", %.0f kcal", cal)
