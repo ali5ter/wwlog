@@ -108,6 +108,9 @@ cache_ttl = 3600    # cache TTL in seconds
 
 ## Credits
 
-`wwlog` is the successor to [wwtracked](https://github.com/ali5ter/wwtracked), a Python script
-that originally reverse-engineered the Weight Watchers API. The API knowledge and authentication
-flow documented there informed the foundation of this project.
+`wwlog` was inspired by [wwtracked](https://github.com/joswr1ght/wwtracked) by
+[Joshua Wright](https://github.com/joswr1ght). Joshua's work reverse-engineering the Weight
+Watchers API — and his willingness to share it — made this project possible. The authentication
+flow and API discovery documented in `wwtracked` provided the foundation that `wwlog` builds on,
+and the clarity and practicality of that original work set the bar for what a WW tool from the
+terminal should feel like.
