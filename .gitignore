@@ -3,4 +3,5 @@ dist/
 *.swp
 *~
 .env
+*.cast
 CLAUDE.md

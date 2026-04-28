@@ -1,12 +1,34 @@
 // Package api contains the WW API client and data types.
 package api
 
+import "encoding/json"
+
 // DefaultPortion holds the canonical portion definition embedded in each tracked food entry.
 type DefaultPortion struct {
-	Name      string             `json:"name"`
-	Size      float64            `json:"size"`
-	Nutrition map[string]float64 `json:"nutrition"`
-	Points    float64            `json:"points"`
+	Name      string         `json:"name"`
+	Size      float64        `json:"size"`
+	Nutrition NutritionMap   `json:"nutrition"`
+	Points    float64        `json:"points"`
+}
+
+// NutritionMap is a mixed-type map from the WW API — most values are floats but
+// some keys (e.g. "isEstimatedSugar") are booleans. Only numeric values are kept.
+type NutritionMap map[string]float64
+
+func (n *NutritionMap) UnmarshalJSON(data []byte) error {
+	var raw map[string]any
+	if err := json.Unmarshal(data, &raw); err != nil {
+		return err
+	}
+	m := make(NutritionMap, len(raw))
+	for k, v := range raw {
+		switch val := v.(type) {
+		case float64:
+			m[k] = val
+		}
+	}
+	*n = m
+	return nil
 }
 
 // FoodEntry represents a single tracked food item.
