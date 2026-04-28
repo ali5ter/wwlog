@@ -4,6 +4,8 @@ Browse and export your Weight Watchers food log from the terminal.
 
 `wwlog` is a TUI application built to let you interactively explore your tracked food log by date, view nutritional summaries, and *export data reports* — without touching the WW app.
 
+![wwlog demo](wwlog_demo.gif)
+
 ## Installation
 
 **Homebrew** (macOS and Linux):
