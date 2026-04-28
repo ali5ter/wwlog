@@ -25,6 +25,7 @@ checksum:
 
 brews:
   - name: wwlog
+    directory: Formula
     repository:
       owner: ali5ter
       name: homebrew-wwlog
