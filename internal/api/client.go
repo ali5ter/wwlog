@@ -23,7 +23,7 @@ func New(token, tld string) *Client {
 	}
 }
 
-// FetchDay retrieves the food log for a single date (YYYY-MM-DD).
+// FetchDay retrieves the food log and points summary for a single date (YYYY-MM-DD).
 func (c *Client) FetchDay(date string) (*DayLog, error) {
 	url := fmt.Sprintf(
 		"https://cmx.weightwatchers.%s/api/v3/cmx/operations/composed/members/~/my-day/%s",
@@ -42,6 +42,19 @@ func (c *Client) FetchDay(date string) (*DayLog, error) {
 
 	var raw struct {
 		Today struct {
+			PointsDetails struct {
+				Weight                   float64 `json:"weight"`
+				WeightUnit               string  `json:"weightUnit"`
+				DailyPointTarget         float64 `json:"dailyPointTarget"`
+				DailyPointsUsed          float64 `json:"dailyPointsUsed"`
+				DailyPointsRemaining     float64 `json:"dailyPointsRemaining"`
+				WeeklyPointAllowance     float64 `json:"weeklyPointAllowance"`
+				WeeklyAllowanceRemaining float64 `json:"weeklyPointAllowanceRemaining"`
+				WeeklyAllowanceUsed      float64 `json:"weeklyPointAllowanceUsed"`
+				ActivityEarned           float64 `json:"dailyActivityPointsEarned"`
+				ActivityRemaining        float64 `json:"dailyActivityPointsRemaining"`
+				VeggieServings           float64 `json:"dailyVeggieServings"`
+			} `json:"pointsDetails"`
 			TrackedFoods Meals `json:"trackedFoods"`
 		} `json:"today"`
 	}
@@ -49,107 +62,25 @@ func (c *Client) FetchDay(date string) (*DayLog, error) {
 		return nil, fmt.Errorf("decode day %s: %w", date, err)
 	}
 
-	return &DayLog{Date: date, Meals: raw.Today.TrackedFoods}, nil
-}
-
-// FetchNutrition retrieves and calculates nutritional data for a food entry.
-// Quick-add entries (MEMBERFOODQUICK) return nil.
-func (c *Client) FetchNutrition(entry *FoodEntry) (*NutritionData, error) {
-	if entry.SourceType == SourceMemberFoodQuick {
-		return nil, nil
-	}
-
-	prefixes := map[string]string{
-		SourceWWFood:       fmt.Sprintf("https://cmx.weightwatchers.%s/api/v3/public/foods/", c.tld),
-		SourceMemberFood:   fmt.Sprintf("https://cmx.weightwatchers.%s/api/v3/cmx/members/~/custom-foods/foods/", c.tld),
-		SourceWWVendorFood: fmt.Sprintf("https://cmx.weightwatchers.%s/api/v3/public/foods/", c.tld),
-		SourceMemberRecipe: fmt.Sprintf("https://cmx.weightwatchers.%s/api/v3/cmx/members/~/custom-foods/recipes/", c.tld),
-		SourceWWRecipe:     fmt.Sprintf("https://cmx.weightwatchers.%s/api/v3/public/recipes/", c.tld),
-	}
-
-	prefix, ok := prefixes[entry.SourceType]
-	if !ok {
-		return nil, fmt.Errorf("unknown source type: %s", entry.SourceType)
-	}
-
-	data := &NutritionData{
-		Name:        entry.Name,
-		PortionName: entry.PortionName,
-		PortionSize: entry.PortionSize,
-		TrackedDate: entry.TrackedDate,
-		TimeOfDay:   entry.TimeOfDay,
-	}
-
-	isRecipe := entry.SourceType == SourceMemberRecipe || entry.SourceType == SourceWWRecipe
-	url := fmt.Sprintf("%s%s?fullDetails=true", prefix, entry.ID)
-
-	resp, err := c.get(url)
-	if err != nil {
-		return nil, fmt.Errorf("fetch nutrition for %s: %w", entry.Name, err)
-	}
-	defer resp.Body.Close()
-
-	if isRecipe {
-		var recipe struct {
-			ServingSize float64 `json:"servingSize"`
-			Ingredients []struct {
-				Quantity   float64 `json:"quantity"`
-				ItemDetail struct {
-					Portions []struct {
-						Size      float64            `json:"size"`
-						Nutrition map[string]float64 `json:"nutrition"`
-					} `json:"portions"`
-				} `json:"itemDetail"`
-			} `json:"ingredients"`
-		}
-		if err := json.NewDecoder(resp.Body).Decode(&recipe); err != nil {
-			return nil, fmt.Errorf("decode recipe nutrition: %w", err)
-		}
-		data.PortionName = "serving(s)"
-		for _, ing := range recipe.Ingredients {
-			if len(ing.ItemDetail.Portions) == 0 || recipe.ServingSize == 0 {
-				continue
-			}
-			p := ing.ItemDetail.Portions[0]
-			scale := ing.Quantity / recipe.ServingSize * entry.PortionSize / p.Size
-			data.Calories += p.Nutrition["calories"] * scale
-			data.Fat += p.Nutrition["fat"] * scale
-			data.SaturatedFat += p.Nutrition["saturatedFat"] * scale
-			data.Sodium += p.Nutrition["sodium"] * scale
-			data.Carbs += p.Nutrition["carbs"] * scale
-			data.Fiber += p.Nutrition["fiber"] * scale
-			data.Sugar += p.Nutrition["sugar"] * scale
-			data.AddedSugar += p.Nutrition["addedSugar"] * scale
-			data.Protein += p.Nutrition["protein"] * scale
-		}
-	} else {
-		var portions []struct {
-			Name      string             `json:"name"`
-			Size      float64            `json:"size"`
-			Nutrition map[string]float64 `json:"nutrition"`
-		}
-		if err := json.NewDecoder(resp.Body).Decode(&portions); err != nil {
-			return nil, fmt.Errorf("decode nutrition: %w", err)
-		}
-		for _, p := range portions {
-			if p.Name != entry.PortionName || p.Size == 0 {
-				continue
-			}
-			scale := entry.PortionSize / p.Size
-			data.Calories = p.Nutrition["calories"] * scale
-			data.Fat = p.Nutrition["fat"] * scale
-			data.SaturatedFat = p.Nutrition["saturatedFat"] * scale
-			data.Sodium = p.Nutrition["sodium"] * scale
-			data.Carbs = p.Nutrition["carbs"] * scale
-			data.Fiber = p.Nutrition["fiber"] * scale
-			data.Sugar = p.Nutrition["sugar"] * scale
-			data.AddedSugar = p.Nutrition["addedSugar"] * scale
-			data.Protein = p.Nutrition["protein"] * scale
-			break
-		}
-	}
-
-	return data, nil
+	pd := raw.Today.PointsDetails
+	return &DayLog{
+		Date:  date,
+		Meals: raw.Today.TrackedFoods,
+		Points: DayPoints{
+			Date:                     date,
+			DailyTarget:              pd.DailyPointTarget,
+			DailyUsed:                pd.DailyPointsUsed,
+			DailyRemaining:           pd.DailyPointsRemaining,
+			WeeklyAllowance:          pd.WeeklyPointAllowance,
+			WeeklyAllowanceRemaining: pd.WeeklyAllowanceRemaining,
+			WeeklyAllowanceUsed:      pd.WeeklyAllowanceUsed,
+			ActivityEarned:           pd.ActivityEarned,
+			ActivityRemaining:        pd.ActivityRemaining,
+			VeggieServings:           pd.VeggieServings,
+			Weight:                   pd.Weight,
+			WeightUnit:               pd.WeightUnit,
+		},
+	}, nil
 }
 
 // DateRange returns a slice of YYYY-MM-DD strings from start to end inclusive.

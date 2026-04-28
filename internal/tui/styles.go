@@ -49,7 +49,7 @@ var (
 
 	styleStatusKey = lipgloss.NewStyle().
 			Background(colorPanel).
-			Foreground(colorPurple)
+			Foreground(colorTeal)
 
 	stylePanelBorder = lipgloss.NewStyle().
 				Border(lipgloss.NormalBorder(), false, true, false, false).
@@ -81,6 +81,9 @@ var (
 
 	styleFilterPrompt = lipgloss.NewStyle().
 				Foreground(colorPurple)
+
+	styleFilterText = lipgloss.NewStyle().
+			Foreground(colorText)
 
 	styleError = lipgloss.NewStyle().
 			Foreground(colorPurple).

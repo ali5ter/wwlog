@@ -22,10 +22,10 @@ func WriteJSON(w io.Writer, logs []*api.DayLog) error {
 	return json.NewEncoder(w).Encode(logs)
 }
 
-// WriteLogCSV writes a simple CSV of food log entries (no nutrition) to w.
+// WriteLogCSV writes a CSV of food log entries with points and calories to w.
 func WriteLogCSV(w io.Writer, logs []*api.DayLog) error {
 	cw := csv.NewWriter(w)
-	_ = cw.Write([]string{"Date", "Meal", "Food", "Portion", "Unit"})
+	_ = cw.Write([]string{"Date", "Meal", "Food", "Serving", "Points", "Calories", "Protein (g)", "Carbs (g)", "Fat (g)"})
 	for _, day := range logs {
 		for meal, entries := range map[string][]api.FoodEntry{
 			"Breakfast": day.Meals.Morning,
@@ -34,9 +34,22 @@ func WriteLogCSV(w io.Writer, logs []*api.DayLog) error {
 			"Snacks":    day.Meals.Anytime,
 		} {
 			for _, e := range entries {
+				serving := e.ServingDesc
+				if serving == "" && e.PortionName != "" {
+					serving = fmt.Sprintf("%g %s", e.PortionSize, e.PortionName)
+				}
+				n := e.Nutrition()
+				pts := e.PointsInfo.MaxPoints
+				if pts == 0 {
+					pts = e.PersonalPoints
+				}
 				_ = cw.Write([]string{
-					day.Date, meal, e.Name,
-					fmt.Sprintf("%g", e.PortionSize), e.PortionName,
+					day.Date, meal, e.Name, serving,
+					fmt.Sprintf("%.0f", pts),
+					fmt.Sprintf("%.0f", n.Calories),
+					fmt.Sprintf("%.1f", n.Protein),
+					fmt.Sprintf("%.1f", n.Carbs),
+					fmt.Sprintf("%.1f", n.Fat),
 				})
 			}
 		}
@@ -50,42 +63,17 @@ func EmitMarkdown(w io.Writer, logs []*api.DayLog) error {
 	fmt.Fprintf(w, "# Weight Watchers Food Log\n\n")
 	for _, day := range logs {
 		fmt.Fprintf(w, "## %s\n\n", day.Date)
+		p := day.Points
+		if p.DailyTarget > 0 {
+			fmt.Fprintf(w, "**Points:** %.0f / %.0f used  ·  Weekly bank: %.0f\n\n",
+				p.DailyUsed, p.DailyTarget, p.WeeklyAllowanceRemaining)
+		}
 		writeMealMD(w, "Breakfast", day.Meals.Morning)
 		writeMealMD(w, "Lunch", day.Meals.Midday)
 		writeMealMD(w, "Dinner", day.Meals.Evening)
 		writeMealMD(w, "Snacks", day.Meals.Anytime)
 	}
 	return nil
-}
-
-// EmitCSV writes nutritional data as CSV to w.
-func EmitCSV(w io.Writer, rows []*api.NutritionData) error {
-	cw := csv.NewWriter(w)
-	_ = cw.Write([]string{
-		"Date", "When", "Food",
-		"Calories", "Fat", "Saturated Fat", "Sodium",
-		"Carbohydrates", "Fiber", "Sugars", "Added Sugar", "Protein",
-	})
-	for _, r := range rows {
-		if r == nil {
-			continue
-		}
-		_ = cw.Write([]string{
-			r.TrackedDate, r.TimeOfDay,
-			fmt.Sprintf("%s, %.1f %s", r.Name, r.PortionSize, r.PortionName),
-			fmt.Sprintf("%.0f", r.Calories),
-			fmt.Sprintf("%.1f", r.Fat),
-			fmt.Sprintf("%.1f", r.SaturatedFat),
-			fmt.Sprintf("%.1f", r.Sodium),
-			fmt.Sprintf("%.1f", r.Carbs),
-			fmt.Sprintf("%.1f", r.Fiber),
-			fmt.Sprintf("%.1f", r.Sugar),
-			fmt.Sprintf("%.1f", r.AddedSugar),
-			fmt.Sprintf("%.1f", r.Protein),
-		})
-	}
-	cw.Flush()
-	return cw.Error()
 }
 
 func writeMealMD(w io.Writer, name string, entries []api.FoodEntry) {
@@ -95,11 +83,27 @@ func writeMealMD(w io.Writer, name string, entries []api.FoodEntry) {
 		return
 	}
 	for _, e := range entries {
-		suffix := ""
-		if e.PortionName != "" {
-			suffix = fmt.Sprintf(", %.4g %s", e.PortionSize, e.PortionName)
+		serving := e.ServingDesc
+		if serving == "" && e.PortionName != "" {
+			serving = fmt.Sprintf("%.4g %s", e.PortionSize, e.PortionName)
+			serving = strings.TrimRight(serving, "0.")
 		}
-		fmt.Fprintf(w, "- %s%s\n", e.Name, strings.TrimRight(suffix, "0."))
+		pts := e.PointsInfo.MaxPoints
+		if pts == 0 {
+			pts = e.PersonalPoints
+		}
+		cal := e.Nutrition().Calories
+		meta := ""
+		if serving != "" {
+			meta += ", " + serving
+		}
+		if pts > 0 {
+			meta += fmt.Sprintf(", %.0fpt", pts)
+		}
+		if cal > 0 {
+			meta += fmt.Sprintf(", %.0f kcal", cal)
+		}
+		fmt.Fprintf(w, "- %s%s\n", e.Name, meta)
 	}
 	fmt.Fprintln(w)
 }

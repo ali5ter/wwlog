@@ -2,11 +2,38 @@
 
 Browse and export your Weight Watchers food log from the terminal.
 
-`wwlog` is a TUI application built with [Bubble Tea](https://github.com/charmbracelet/bubbletea) that lets you
-interactively explore your tracked food log by date, view nutritional summaries, and export reports — without
-touching the WW website or app.
+`wwlog` is a TUI application built to let you interactively explore your tracked food log by date, view nutritional summaries, and *export data reports* — without touching the WW app.
 
 ## Installation
+
+**Homebrew** (macOS and Linux):
+
+```bash
+brew tap ali5ter/wwlog
+brew install wwlog
+```
+
+**Binary** (macOS and Linux, no Go required):
+
+```bash
+# macOS Apple Silicon
+curl -sL https://github.com/ali5ter/wwlog/releases/latest/download/wwlog_darwin_arm64.tar.gz | tar -xz
+sudo mv wwlog /usr/local/bin/
+
+# macOS Intel
+curl -sL https://github.com/ali5ter/wwlog/releases/latest/download/wwlog_darwin_amd64.tar.gz | tar -xz
+sudo mv wwlog /usr/local/bin/
+
+# Linux arm64
+curl -sL https://github.com/ali5ter/wwlog/releases/latest/download/wwlog_linux_arm64.tar.gz | tar -xz
+sudo mv wwlog /usr/local/bin/
+
+# Linux amd64
+curl -sL https://github.com/ali5ter/wwlog/releases/latest/download/wwlog_linux_amd64.tar.gz | tar -xz
+sudo mv wwlog /usr/local/bin/
+```
+
+**Go**:
 
 ```bash
 go install github.com/ali5ter/wwlog@latest
@@ -58,6 +85,14 @@ wwlog --logout
 | `--login` | — | Authenticate and store credentials |
 | `--logout` | — | Clear stored credentials |
 | `-l`, `--tld` | `com` | WW domain (com, co.uk, etc.) |
+
+## WW API reference
+
+[`WW_API_REFERENCE.md`](WW_API_REFERENCE.md) documents the Weight Watchers API
+endpoints used by `wwlog`, reverse-engineered from live traffic. It covers
+authentication, the member profile endpoint, and the `my-day` food log endpoint,
+including all known fields and their meanings. Useful for developers building
+tools against the WW API.
 
 ## Configuration
 

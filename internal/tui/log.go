@@ -2,11 +2,14 @@ package tui
 
 import (
 	"fmt"
+	"math"
 	"strings"
 	"time"
 
 	"github.com/ali5ter/wwlog/internal/api"
+	"github.com/charmbracelet/bubbles/key"
 	"github.com/charmbracelet/bubbles/list"
+	"github.com/charmbracelet/bubbles/textinput"
 	"github.com/charmbracelet/bubbles/viewport"
 	tea "github.com/charmbracelet/bubbletea"
 	"github.com/charmbracelet/lipgloss"
@@ -15,8 +18,11 @@ import (
 // logModel is the food log tab — a date list on the left, meal detail on the right.
 type logModel struct {
 	list        list.Model
+	filter      textinput.Model
+	filtering   bool
 	detail      viewport.Model
-	logs        []*api.DayLog
+	allLogs     []*api.DayLog
+	logs        []*api.DayLog // filtered view
 	width       int
 	height      int
 	selected    int
@@ -34,30 +40,40 @@ func (d dateItem) FilterValue() string { return d.log.Date }
 func newLogModel(logs []*api.DayLog, width, height int) logModel {
 	listWidth := width / 3
 	detailWidth := width - listWidth
+	listHeight := height - 2 // filter bar + separator
 
 	items := make([]list.Item, len(logs))
 	for i, l := range logs {
 		items[i] = dateItem{log: l}
 	}
 
-	l := list.New(items, list.NewDefaultDelegate(), listWidth, height)
+	l := list.New(items, list.NewDefaultDelegate(), listWidth, listHeight)
 	l.Title = "Dates"
 	l.Styles.Title = styleMealHeading
 	l.SetShowStatusBar(false)
-	l.SetFilteringEnabled(true)
+	l.SetShowHelp(false)
+	l.SetFilteringEnabled(false)
+
+	fi := textinput.New()
+	fi.Placeholder = "filter by date…"
+	fi.PromptStyle = styleFilterPrompt
+	fi.TextStyle = styleFilterText
+	fi.Prompt = "> "
 
 	vp := viewport.New(detailWidth, height)
 
 	m := logModel{
 		list:        l,
+		filter:      fi,
 		detail:      vp,
+		allLogs:     logs,
 		logs:        logs,
 		width:       width,
 		height:      height,
 		initialized: true,
 	}
 	if len(logs) > 0 {
-		m.detail.SetContent(renderDay(logs[0]))
+		m.detail.SetContent(renderDay(logs[0], detailWidth-2))
 	}
 	return m
 }
@@ -66,24 +82,103 @@ func (m logModel) update(msg tea.Msg) (logModel, tea.Cmd) {
 	var cmds []tea.Cmd
 	var cmd tea.Cmd
 
+	if msg, ok := msg.(tea.KeyMsg); ok {
+		if m.filtering {
+			switch msg.String() {
+			case "enter", "esc":
+				m.filtering = false
+				m.filter.Blur()
+				m.applyFilter()
+				return m, nil
+			case "up", "k", "down", "j":
+				m.filtering = false
+				m.filter.Blur()
+				m.applyFilter()
+				// fall through to list navigation below
+			default:
+				m.filter, cmd = m.filter.Update(msg)
+				cmds = append(cmds, cmd)
+				m.applyFilter()
+				return m, tea.Batch(cmds...)
+			}
+		} else {
+			switch {
+			case key.Matches(msg, keys.Filter):
+				m.filtering = true
+				m.filter.Focus()
+				return m, textinput.Blink
+			case key.Matches(msg, keys.ScrollUp):
+				m.detail.LineUp(3)
+				return m, nil
+			case key.Matches(msg, keys.ScrollDown):
+				m.detail.LineDown(3)
+				return m, nil
+			}
+		}
+	}
+
 	m.list, cmd = m.list.Update(msg)
 	cmds = append(cmds, cmd)
 
+	selChanged := false
 	if i := m.list.Index(); i != m.selected && i < len(m.logs) {
 		m.selected = i
-		m.detail.SetContent(renderDay(m.logs[i]))
+		m.detail.SetContent(renderDay(m.logs[i], m.detail.Width-2))
 		m.detail.GotoTop()
+		selChanged = true
 	}
 
-	m.detail, cmd = m.detail.Update(msg)
-	cmds = append(cmds, cmd)
+	if !selChanged {
+		m.detail, cmd = m.detail.Update(msg)
+		cmds = append(cmds, cmd)
+	}
 
 	return m, tea.Batch(cmds...)
 }
 
+func (m *logModel) applyFilter() {
+	q := strings.ToLower(m.filter.Value())
+	var filtered []*api.DayLog
+	for _, l := range m.allLogs {
+		if q == "" ||
+			strings.Contains(strings.ToLower(l.Date), q) ||
+			strings.Contains(strings.ToLower(formatDateShort(l.Date)), q) {
+			filtered = append(filtered, l)
+		}
+	}
+	m.logs = filtered
+	items := make([]list.Item, len(filtered))
+	for i, l := range filtered {
+		items[i] = dateItem{log: l}
+	}
+	m.list.SetItems(items)
+	m.selected = 0
+	if len(filtered) > 0 {
+		m.detail.SetContent(renderDay(filtered[0], m.detail.Width-2))
+	} else {
+		m.detail.SetContent(styleFoodPortion.Render("No matching dates."))
+	}
+	m.detail.GotoTop()
+}
+
 func (m logModel) view() string {
-	listPane := stylePanelBorder.Render(m.list.View())
-	detailPane := m.detail.View()
+	listWidth := m.width / 3
+	detailWidth := m.width - listWidth
+
+	var filterBar string
+	if m.filtering {
+		filterBar = m.filter.View()
+	} else if m.filter.Value() != "" {
+		filterBar = styleFilterPrompt.Render("> ") + styleFilterText.Render(m.filter.Value())
+	} else {
+		filterBar = styleDim.Render("> filter by date…")
+	}
+	filterSep := styleDim.Render(strings.Repeat("─", listWidth-1))
+
+	listPane := stylePanelBorder.Width(listWidth).Render(
+		lipgloss.JoinVertical(lipgloss.Left, filterBar, filterSep, m.list.View()),
+	)
+	detailPane := lipgloss.NewStyle().Width(detailWidth).Padding(0, 1).Render(m.detail.View())
 	return lipgloss.JoinHorizontal(lipgloss.Top, listPane, detailPane)
 }
 
@@ -94,18 +189,62 @@ func (m *logModel) resize(width, height int) {
 	m.width = width
 	m.height = height
 	listWidth := width / 3
-	m.list.SetSize(listWidth, height)
-	m.detail.Width = width - listWidth
+	listHeight := height - 2
+	m.list.SetSize(listWidth, listHeight)
+	detailWidth := width - listWidth
+	m.detail.Width = detailWidth
 	m.detail.Height = height
+	if m.selected < len(m.logs) && len(m.logs) > 0 {
+		m.detail.SetContent(renderDay(m.logs[m.selected], detailWidth-2))
+	}
 }
 
-func renderDay(day *api.DayLog) string {
+func renderPointsSummary(b *strings.Builder, pts api.DayPoints, contentWidth int) {
+	if pts.DailyTarget == 0 {
+		return
+	}
+	barWidth := 20
+	bar := makeBar(pts.DailyUsed, pts.DailyTarget, barWidth)
+
+	usedStr := styleDetailValue.Render(fmt.Sprintf("%.0f", pts.DailyUsed))
+	targetStr := styleFoodPortion.Render(fmt.Sprintf("/ %.0f", pts.DailyTarget))
+	remStr := styleFoodPortion.Render(fmt.Sprintf("  %.0f left", pts.DailyRemaining))
+
+	dailyLabel := lipgloss.NewStyle().Width(8).Render(styleDetailLabel.Render("Points"))
+	fmt.Fprintf(b, "  %s  %s  %s %s%s\n", dailyLabel, bar, usedStr, targetStr, remStr)
+
+	var meta []string
+	if pts.WeeklyAllowanceRemaining != 0 {
+		meta = append(meta, fmt.Sprintf("Weekly bank %+.0f", pts.WeeklyAllowanceRemaining))
+	}
+	if pts.ActivityEarned != 0 {
+		meta = append(meta, fmt.Sprintf("Activity +%.0f earned", pts.ActivityEarned))
+	}
+	if pts.VeggieServings > 0 {
+		meta = append(meta, fmt.Sprintf("Veggies %.0f ☁", pts.VeggieServings))
+	}
+	if pts.Weight > 0 {
+		meta = append(meta, fmt.Sprintf("Weight %.1f %s", pts.Weight, pts.WeightUnit))
+	}
+	if len(meta) > 0 {
+		fmt.Fprintf(b, "  %s\n", styleFoodPortion.Render(strings.Join(meta, "  ·  ")))
+	}
+	fmt.Fprintln(b)
+}
+
+func renderDay(day *api.DayLog, width int) string {
 	var b strings.Builder
-	fmt.Fprintf(&b, "%s\n\n", styleMealHeading.Render(formatDateLong(day.Date)))
+	sepWidth := width - 2
+	if sepWidth < 1 {
+		sepWidth = 1
+	}
+	fmt.Fprintf(&b, "%s\n", styleMealHeading.Render(formatDateLong(day.Date)))
+	fmt.Fprintf(&b, "%s\n\n", styleDim.Render(strings.Repeat("─", sepWidth)))
+	renderPointsSummary(&b, day.Points, width)
 	renderMeal(&b, "☀  Breakfast", day.Meals.Morning)
 	renderMeal(&b, "☁  Lunch", day.Meals.Midday)
-	renderMeal(&b, "🌙  Dinner", day.Meals.Evening)
-	renderMeal(&b, "🍎  Snacks", day.Meals.Anytime)
+	renderMeal(&b, "☽  Dinner", day.Meals.Evening)
+	renderMeal(&b, "✦  Snacks", day.Meals.Anytime)
 	return b.String()
 }
 
@@ -115,13 +254,44 @@ func renderMeal(b *strings.Builder, name string, entries []api.FoodEntry) {
 		fmt.Fprintf(b, "  %s\n", styleFoodPortion.Render("Nothing logged"))
 	}
 	for _, e := range entries {
-		portion := ""
-		if e.PortionName != "" {
-			portion = styleFoodPortion.Render(fmt.Sprintf("  %s %s", formatPortion(e.PortionSize), e.PortionName))
+		serving := e.ServingDesc
+		if serving == "" && e.PortionName != "" {
+			serving = fmt.Sprintf("%s %s", formatPortion(e.PortionSize), e.PortionName)
 		}
-		fmt.Fprintf(b, "  %s%s\n", styleFoodItem.Render(e.Name), portion)
+
+		pts := entryPoints(e)
+		ptsStr := styleStatusKey.Render(fmt.Sprintf("  %.0fpt", pts))
+
+		cal := e.Nutrition().Calories
+		calStr := ""
+		if cal > 0 {
+			calStr = styleFoodPortion.Render(fmt.Sprintf("  %.0f kcal", cal))
+		}
+
+		servingStr := ""
+		if serving != "" {
+			servingStr = styleFoodPortion.Render("  " + serving)
+		}
+
+		fmt.Fprintf(b, "  %s%s%s%s\n",
+			styleFoodItem.Render(truncate(e.Name, 35)),
+			servingStr, ptsStr, calStr)
 	}
 	fmt.Fprintln(b)
+}
+
+// entryPoints returns the best available points value for a food entry.
+func entryPoints(e api.FoodEntry) float64 {
+	if e.PointsInfo.MaxPoints != 0 {
+		return math.Round(e.PointsInfo.MaxPoints)
+	}
+	if e.PersonalPoints != 0 {
+		return math.Round(e.PersonalPoints)
+	}
+	if e.SmartPoints != 0 {
+		return math.Round(e.SmartPoints)
+	}
+	return math.Round(e.Points)
 }
 
 func mealSummary(day *api.DayLog) string {
@@ -129,7 +299,7 @@ func mealSummary(day *api.DayLog) string {
 	l := len(day.Meals.Midday)
 	d := len(day.Meals.Evening)
 	s := len(day.Meals.Anytime)
-	return fmt.Sprintf("☀ %d  ☁ %d  🌙 %d  🍎 %d", b, l, d, s)
+	return fmt.Sprintf("☀ %d  ☁ %d  ☽ %d  ✦ %d", b, l, d, s)
 }
 
 func formatDateShort(date string) string {

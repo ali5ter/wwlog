@@ -2,9 +2,11 @@ package tui
 
 import (
 	"fmt"
+	"strings"
 	"time"
 
 	"github.com/ali5ter/wwlog/internal/auth"
+	"github.com/charmbracelet/bubbles/spinner"
 	"github.com/charmbracelet/huh"
 	tea "github.com/charmbracelet/bubbletea"
 	"github.com/charmbracelet/lipgloss"
@@ -40,15 +42,20 @@ type splashModel struct {
 	height   int
 	err      string
 	form     *huh.Form
+	spinner  spinner.Model
 }
 
 func newSplashModel(a *auth.Auth, version, preStart, preEnd string) splashModel {
+	s := spinner.New()
+	s.Spinner = spinner.Points
+	s.Style = lipgloss.NewStyle().Foreground(colorTeal)
 	return splashModel{
 		phase:    splashChecking,
 		authObj:  a,
 		version:  version,
 		preStart: preStart,
 		preEnd:   preEnd,
+		spinner:  s,
 	}
 }
 
@@ -58,7 +65,7 @@ func (m *splashModel) resize(width, height int) {
 }
 
 func (m splashModel) init() tea.Cmd {
-	return m.checkAuthCmd
+	return tea.Batch(m.checkAuthCmd, m.spinner.Tick)
 }
 
 func (m splashModel) checkAuthCmd() tea.Msg {
@@ -148,6 +155,14 @@ func (m splashModel) formWidth() int {
 func (m splashModel) update(msg tea.Msg) (splashModel, tea.Cmd) {
 	switch msg := msg.(type) {
 
+	case spinner.TickMsg:
+		if m.phase == splashChecking {
+			var cmd tea.Cmd
+			m.spinner, cmd = m.spinner.Update(msg)
+			return m, cmd
+		}
+		return m, nil
+
 	case authCheckedMsg:
 		m.err = ""
 		if msg.authed {
@@ -187,15 +202,27 @@ func (m splashModel) update(msg tea.Msg) (splashModel, tea.Cmd) {
 	return m, cmd
 }
 
+// renderGradientLogo renders the WW ASCII logo with a teal→purple→steel gradient.
+func renderGradientLogo() string {
+	lines := strings.Split(strings.TrimLeft(asciiLogo, "\n"), "\n")
+	palette := []lipgloss.Color{colorTeal, colorTeal, colorPurple, colorPurple, colorSteel, colorMuted}
+	rendered := make([]string, len(lines))
+	for i, line := range lines {
+		c := palette[i%len(palette)]
+		rendered[i] = lipgloss.NewStyle().Foreground(c).Bold(true).Render(line)
+	}
+	return strings.Join(rendered, "\n")
+}
+
 func (m splashModel) view() string {
-	logoStr := styleSplashLogo.Render(asciiLogo)
+	logoStr := renderGradientLogo()
 	titleStr := styleSplashTitle.Render("wwlog  " + m.version)
 	subStr := styleSplashSub.Render("Weight Watchers food log browser")
 
 	var middle string
 	switch m.phase {
 	case splashChecking:
-		middle = styleSplashSub.Render("Checking credentials…")
+		middle = styleSplashSub.Render(m.spinner.View() + "  Checking credentials…")
 	default:
 		if m.form != nil {
 			middle = m.form.View()

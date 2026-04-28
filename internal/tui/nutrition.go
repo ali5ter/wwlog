@@ -2,62 +2,330 @@ package tui
 
 import (
 	"fmt"
+	"math"
 	"strings"
 
 	"github.com/ali5ter/wwlog/internal/api"
+	"github.com/charmbracelet/bubbles/list"
 	"github.com/charmbracelet/bubbles/viewport"
 	tea "github.com/charmbracelet/bubbletea"
+	"github.com/charmbracelet/lipgloss"
 )
 
-// nutriModel is the nutrition summary tab.
-// TODO: Add per-day bar charts using lipgloss once nutrition fetch is wired in.
-type nutriModel struct {
-	viewport viewport.Model
-	logs     []*api.DayLog
-	width    int
-	height   int
+// rdv holds reference daily values used as bar maximums.
+var rdv = &api.DayNutrition{
+	Calories:     2000,
+	Fat:          65,
+	SaturatedFat: 20,
+	Sodium:       2300,
+	Carbs:        300,
+	Fiber:        28,
+	Sugar:        50,
+	Protein:      50,
+	Alcohol:      28,
 }
 
-func newNutriModel(logs []*api.DayLog, width, height int) nutriModel {
-	vp := viewport.New(width, height)
-	vp.SetContent(renderNutritionPlaceholder(logs))
-	return nutriModel{viewport: vp, logs: logs, width: width, height: height}
+type nutriModel struct {
+	list        list.Model
+	detail      viewport.Model
+	logs        []*api.DayLog
+	data        map[string]*api.DayNutrition
+	avgs        *api.DayNutrition
+	width       int
+	height      int
+	selected    int
+	initialized bool
+}
+
+func newNutriModel(logs []*api.DayLog, data map[string]*api.DayNutrition, width, height int) nutriModel {
+	listWidth := width / 3
+	listHeight := height - 2
+
+	items := make([]list.Item, len(logs))
+	for i, l := range logs {
+		items[i] = dateItem{log: l}
+	}
+
+	l := list.New(items, list.NewDefaultDelegate(), listWidth, listHeight)
+	l.Title = "Dates"
+	l.Styles.Title = styleMealHeading
+	l.SetShowStatusBar(false)
+	l.SetShowHelp(false)
+	l.SetFilteringEnabled(false)
+
+	vp := viewport.New(width-listWidth, height)
+
+	m := nutriModel{
+		list:        l,
+		detail:      vp,
+		logs:        logs,
+		data:        data,
+		avgs:        computeAverages(data, logs),
+		width:       width,
+		height:      height,
+		initialized: true,
+	}
+	m.detail.SetContent(m.renderDetail())
+	return m
 }
 
 func (m nutriModel) update(msg tea.Msg) (nutriModel, tea.Cmd) {
 	var cmd tea.Cmd
-	m.viewport, cmd = m.viewport.Update(msg)
-	return m, cmd
+	m.list, cmd = m.list.Update(msg)
+	selChanged := false
+	if i := m.list.Index(); i != m.selected && i < len(m.logs) {
+		m.selected = i
+		m.detail.SetContent(m.renderDetail())
+		m.detail.GotoTop()
+		selChanged = true
+	}
+	var cmd2 tea.Cmd
+	if !selChanged {
+		m.detail, cmd2 = m.detail.Update(msg)
+	}
+	return m, tea.Batch(cmd, cmd2)
 }
 
 func (m nutriModel) view() string {
-	return m.viewport.View()
+	listWidth := m.width / 3
+	detailWidth := m.width - listWidth
+
+	label := styleDim.Render("> dates")
+	sep := styleDim.Render(strings.Repeat("─", listWidth-1))
+
+	listPane := stylePanelBorder.Width(listWidth).Render(
+		lipgloss.JoinVertical(lipgloss.Left, label, sep, m.list.View()),
+	)
+	detailPane := lipgloss.NewStyle().Width(detailWidth).Padding(0, 1).Render(m.detail.View())
+	return lipgloss.JoinHorizontal(lipgloss.Top, listPane, detailPane)
 }
 
 func (m *nutriModel) resize(width, height int) {
+	if !m.initialized {
+		return
+	}
 	m.width = width
 	m.height = height
-	m.viewport.Width = width
-	m.viewport.Height = height
+	listWidth := width / 3
+	m.list.SetSize(listWidth, height-2)
+	detailWidth := width - listWidth
+	m.detail.Width = detailWidth
+	m.detail.Height = height
+	m.detail.SetContent(m.renderDetail())
 }
 
-func renderNutritionPlaceholder(logs []*api.DayLog) string {
-	var b strings.Builder
-	fmt.Fprintf(&b, "%s\n\n", styleMealHeading.Render("Nutrition Summary"))
-	fmt.Fprintf(&b, "%s\n\n",
-		styleDetailValue.Render("Nutritional data requires fetching each food item individually."),
-	)
-	fmt.Fprintf(&b, "%s\n",
-		styleFoodPortion.Render("Run with --nutrition flag to enable, or press ^E to export a nutrition CSV."),
-	)
-	fmt.Fprintf(&b, "\n%s\n", styleDim.Render(strings.Repeat("─", 40)))
-	for _, day := range logs {
-		total := len(day.Meals.Morning) + len(day.Meals.Midday) +
-			len(day.Meals.Evening) + len(day.Meals.Anytime)
-		fmt.Fprintf(&b, "  %s  %s\n",
-			styleDetailLabel.Render(day.Date),
-			styleFoodPortion.Render(fmt.Sprintf("%d items", total)),
-		)
+func (m *nutriModel) renderDetail() string {
+	if m.data == nil || len(m.data) == 0 {
+		return styleFoodPortion.Render("No nutrition data available.")
 	}
+	if m.selected >= len(m.logs) || len(m.logs) == 0 {
+		return ""
+	}
+
+	day := m.logs[m.selected]
+	dn := m.data[day.Date]
+	if dn == nil {
+		return styleFoodPortion.Render("No data for this date.")
+	}
+
+	vw := m.detail.Width - 2
+	if vw < 40 {
+		vw = 40
+	}
+	sepWidth := vw - 2
+	barWidth := 24
+	if barWidth > vw-36 {
+		barWidth = vw - 36
+	}
+	if barWidth < 8 {
+		barWidth = 8
+	}
+
+	var b strings.Builder
+	fmt.Fprintf(&b, "%s\n", styleMealHeading.Render(formatDateLong(day.Date)))
+	fmt.Fprintf(&b, "%s\n\n", styleDim.Render(strings.Repeat("─", sepWidth)))
+
+	// Points summary.
+	renderPointsSummary(&b, day.Points, vw)
+
+	fmt.Fprintf(&b, "%s\n\n", styleDim.Render(strings.Repeat("─", sepWidth)))
+
+	// Nutrition bars vs recommended daily values.
+	fmt.Fprintf(&b, "%s\n\n", styleDetailLabel.Render("Nutrition  (bars show % of daily reference)"))
+	writeNutriBar(&b, "Calories", "kcal", dn.Calories, rdv.Calories, m.avgs.Calories, barWidth)
+	writeNutriBar(&b, "Protein", "g", dn.Protein, rdv.Protein, m.avgs.Protein, barWidth)
+	writeNutriBar(&b, "Carbs", "g", dn.Carbs, rdv.Carbs, m.avgs.Carbs, barWidth)
+	writeNutriBar(&b, "Fat", "g", dn.Fat, rdv.Fat, m.avgs.Fat, barWidth)
+	writeNutriBar(&b, "Sat Fat", "g", dn.SaturatedFat, rdv.SaturatedFat, m.avgs.SaturatedFat, barWidth)
+	writeNutriBar(&b, "Fiber", "g", dn.Fiber, rdv.Fiber, m.avgs.Fiber, barWidth)
+	writeNutriBar(&b, "Sodium", "mg", dn.Sodium, rdv.Sodium, m.avgs.Sodium, barWidth)
+	writeNutriBar(&b, "Sugar", "g", dn.Sugar, rdv.Sugar, m.avgs.Sugar, barWidth)
+	if dn.Alcohol > 0 || m.avgs.Alcohol > 0 {
+		writeNutriBar(&b, "Alcohol", "g", dn.Alcohol, rdv.Alcohol, m.avgs.Alcohol, barWidth)
+	}
+
+	if len(m.logs) > 1 {
+		fmt.Fprintf(&b, "\n%s\n\n", styleDim.Render(strings.Repeat("─", sepWidth)))
+		fmt.Fprintf(&b, "%s\n\n", styleDetailLabel.Render("Trends across date range"))
+		writeTrendTable(&b, m.logs, m.data)
+	}
+
 	return b.String()
+}
+
+func (m *nutriModel) nutriSeries(fn func(*api.DayNutrition) float64) []float64 {
+	vals := make([]float64, 0, len(m.logs))
+	for _, day := range m.logs {
+		if dn, ok := m.data[day.Date]; ok {
+			vals = append(vals, fn(dn))
+		}
+	}
+	return vals
+}
+
+func writeNutriBar(b *strings.Builder, label, unit string, value, max, avg float64, barWidth int) {
+	bar := makeBar(value, max, barWidth)
+	labelCol := lipgloss.NewStyle().Width(11).Render(styleDetailLabel.Render(label))
+	valCol := lipgloss.NewStyle().Width(14).Render(styleDetailValue.Render(fmt.Sprintf("%s %s", formatNutriValue(value), unit)))
+	avgCol := styleFoodPortion.Render(fmt.Sprintf("avg %s", formatNutriValue(avg)))
+	fmt.Fprintf(b, "  %s%s%s  %s\n", labelCol, valCol, bar, avgCol)
+}
+
+func writeTrendTable(b *strings.Builder, logs []*api.DayLog, data map[string]*api.DayNutrition) {
+	type series struct {
+		label  string
+		unit   string
+		values []float64
+	}
+	cols := len(logs)
+	series4 := []series{
+		{label: "Calories", unit: "kcal"},
+		{label: "Protein", unit: "g"},
+		{label: "Carbs", unit: "g"},
+		{label: "Fat", unit: "g"},
+	}
+	for i := range series4 {
+		series4[i].values = make([]float64, cols)
+	}
+	for j, day := range logs {
+		if dn, ok := data[day.Date]; ok {
+			series4[0].values[j] = dn.Calories
+			series4[1].values[j] = dn.Protein
+			series4[2].values[j] = dn.Carbs
+			series4[3].values[j] = dn.Fat
+		}
+	}
+
+	labelW := 10
+	colW := 6
+
+	// Date header row.
+	var hdr strings.Builder
+	hdr.WriteString(strings.Repeat(" ", labelW+2))
+	for _, day := range logs {
+		dd := day.Date
+		if len(dd) >= 10 {
+			dd = dd[8:10]
+		}
+		hdr.WriteString(lipgloss.NewStyle().Width(colW).Align(lipgloss.Center).Render(styleFoodPortion.Render(dd)))
+	}
+	fmt.Fprintf(b, "%s\n", hdr.String())
+
+	blocks := []rune("▁▂▃▄▅▆▇█")
+	for _, s := range series4 {
+		var maxV float64
+		for _, v := range s.values {
+			if v > maxV {
+				maxV = v
+			}
+		}
+		// Sparkline row.
+		var spark strings.Builder
+		for _, v := range s.values {
+			idx := 0
+			if maxV > 0 {
+				idx = int(v / maxV * float64(len(blocks)-1))
+			}
+			if idx >= len(blocks) {
+				idx = len(blocks) - 1
+			}
+			spark.WriteString(lipgloss.NewStyle().Width(colW).Align(lipgloss.Center).Render(
+				lipgloss.NewStyle().Foreground(colorTeal).Render(string(blocks[idx])),
+			))
+		}
+		labelPart := lipgloss.NewStyle().Width(labelW).Render(styleDetailLabel.Render(s.label))
+		fmt.Fprintf(b, "  %s%s\n", labelPart, spark.String())
+
+		// Values row.
+		var vals strings.Builder
+		for _, v := range s.values {
+			vals.WriteString(lipgloss.NewStyle().Width(colW).Align(lipgloss.Center).Render(
+				styleFoodPortion.Render(formatNutriValue(v)),
+			))
+		}
+		fmt.Fprintf(b, "  %s%s  %s\n\n", strings.Repeat(" ", labelW), vals.String(), styleFoodPortion.Render(s.unit))
+	}
+}
+
+func makeBar(value, max float64, width int) string {
+	if width == 0 {
+		return ""
+	}
+	filled := 0
+	if max > 0 {
+		filled = int(math.Round(value / max * float64(width)))
+	}
+	if filled > width {
+		filled = width
+	}
+	empty := width - filled
+	return lipgloss.NewStyle().Foreground(colorTeal).Render(strings.Repeat("█", filled)) +
+		lipgloss.NewStyle().Foreground(colorLine).Render(strings.Repeat("░", empty))
+}
+
+func formatNutriValue(v float64) string {
+	if v == 0 {
+		return "—"
+	}
+	if v >= 100 {
+		return fmt.Sprintf("%.0f", v)
+	}
+	if v == math.Trunc(v) {
+		return fmt.Sprintf("%.0f", v)
+	}
+	return fmt.Sprintf("%.1f", v)
+}
+
+func computeAverages(data map[string]*api.DayNutrition, logs []*api.DayLog) *api.DayNutrition {
+	avg := &api.DayNutrition{}
+	n := 0
+	for _, day := range logs {
+		dn, ok := data[day.Date]
+		if !ok {
+			continue
+		}
+		avg.Calories += dn.Calories
+		avg.Fat += dn.Fat
+		avg.SaturatedFat += dn.SaturatedFat
+		avg.Sodium += dn.Sodium
+		avg.Carbs += dn.Carbs
+		avg.Fiber += dn.Fiber
+		avg.Sugar += dn.Sugar
+		avg.Protein += dn.Protein
+		avg.Alcohol += dn.Alcohol
+		n++
+	}
+	if n > 0 {
+		f := float64(n)
+		avg.Calories /= f
+		avg.Fat /= f
+		avg.SaturatedFat /= f
+		avg.Sodium /= f
+		avg.Carbs /= f
+		avg.Fiber /= f
+		avg.Sugar /= f
+		avg.Protein /= f
+		avg.Alcohol /= f
+	}
+	return avg
 }

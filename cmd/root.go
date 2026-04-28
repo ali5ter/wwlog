@@ -16,15 +16,15 @@ import (
 )
 
 var (
-	flagStart     string
-	flagEnd       string
-	flagNutrition bool
-	flagJSON      bool
-	flagNoTTY     bool
-	flagLogin     bool
-	flagLogout    bool
-	flagTLD       string
-	version       = "0.1.0"
+	flagStart  string
+	flagEnd    string
+	flagJSON   bool
+	flagReport bool
+	flagNoTTY  bool
+	flagLogin  bool
+	flagLogout bool
+	flagTLD    string
+	version    = "0.1.0"
 )
 
 var rootCmd = &cobra.Command{
@@ -44,8 +44,8 @@ func Execute() {
 func init() {
 	rootCmd.Flags().StringVarP(&flagStart, "start", "s", "", "Start date (YYYY-MM-DD, default: last 7 days)")
 	rootCmd.Flags().StringVarP(&flagEnd, "end", "e", "", "End date (YYYY-MM-DD, default: today)")
-	rootCmd.Flags().BoolVarP(&flagNutrition, "nutrition", "n", false, "Include nutritional data")
 	rootCmd.Flags().BoolVar(&flagJSON, "json", false, "Emit log as JSON to stdout")
+	rootCmd.Flags().BoolVarP(&flagReport, "report", "r", false, "Emit insights report to stdout")
 	rootCmd.Flags().BoolVar(&flagNoTTY, "no-tty", false, "Force pipeline mode even in a terminal")
 	rootCmd.Flags().BoolVar(&flagLogin, "login", false, "Authenticate and store credentials")
 	rootCmd.Flags().BoolVar(&flagLogout, "logout", false, "Clear stored credentials")
@@ -95,7 +95,7 @@ func run(cmd *cobra.Command, _ []string) error {
 	}
 
 	// Pipeline mode: requires explicit dates; defaults to today if omitted.
-	if flagJSON || flagNoTTY || !isTTY() {
+	if flagJSON || flagReport || flagNoTTY || !isTTY() {
 		start := flagStart
 		if start == "" {
 			start = time.Now().Format("2006-01-02")
@@ -113,11 +113,14 @@ func run(cmd *cobra.Command, _ []string) error {
 		if err != nil {
 			return err
 		}
+		if flagReport {
+			return pipeline.EmitTextReport(os.Stdout, logs)
+		}
 		return pipeline.EmitJSON(logs)
 	}
 
 	// TUI mode: auth and date range handled inside the TUI.
-	return tui.Run(authenticator, tld, flagStart, flagEnd, flagNutrition, version)
+	return tui.Run(authenticator, tld, flagStart, flagEnd, version)
 }
 
 func loadLogs(client *api.Client, start, end string) ([]*api.DayLog, error) {

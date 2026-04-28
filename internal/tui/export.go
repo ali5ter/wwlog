@@ -38,6 +38,7 @@ func newExportModel(width, height int) exportModel {
 				Title("Export format").
 				Description("Choose how to save your food log").
 				Options(
+					huh.NewOption("Report    insights summary (text)", "report"),
 					huh.NewOption("JSON      full structured data", "json"),
 					huh.NewOption("Markdown  readable daily report", "md"),
 					huh.NewOption("CSV       food log entries", "csv"),
@@ -73,6 +74,9 @@ func (m exportModel) view() string {
 func runExport(format, start, end string, logs []*api.DayLog) tea.Cmd {
 	return func() tea.Msg {
 		ext := format
+		if ext == "report" {
+			ext = "txt"
+		}
 		filename := fmt.Sprintf("wwlog-%s_%s.%s", start, end, ext)
 		f, err := os.Create(filename)
 		if err != nil {
@@ -81,6 +85,8 @@ func runExport(format, start, end string, logs []*api.DayLog) tea.Cmd {
 		defer f.Close()
 
 		switch format {
+		case "report":
+			err = pipeline.EmitTextReport(f, logs)
 		case "json":
 			err = pipeline.WriteJSON(f, logs)
 		case "md":
