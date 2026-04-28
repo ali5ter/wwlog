@@ -4,7 +4,7 @@ Browse and export your Weight Watchers food log from the terminal.
 
 `wwlog` is a TUI application built to let you interactively explore your tracked food log by date, view nutritional summaries, and *export data reports* — without touching the WW app.
 
-![wwlog demo](wwlog_demo.gif)
+![wwlog demo](examples/wwlog_demo.gif)
 
 ## Installation
 
@@ -105,3 +105,9 @@ tld       = "com"   # WW top-level domain
 theme     = "auto"  # colour theme
 cache_ttl = 3600    # cache TTL in seconds
 ```
+
+## Credits
+
+`wwlog` is the successor to [wwtracked](https://github.com/ali5ter/wwtracked), a Python script
+that originally reverse-engineered the Weight Watchers API. The API knowledge and authentication
+flow documented there informed the foundation of this project.
