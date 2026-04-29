@@ -6,6 +6,7 @@ import (
 	"strings"
 
 	"github.com/ali5ter/wwlog/internal/api"
+	"github.com/charmbracelet/bubbles/key"
 	"github.com/charmbracelet/bubbles/list"
 	"github.com/charmbracelet/bubbles/viewport"
 	tea "github.com/charmbracelet/bubbletea"
@@ -70,6 +71,17 @@ func newNutriModel(logs []*api.DayLog, data map[string]*api.DayNutrition, width,
 }
 
 func (m nutriModel) update(msg tea.Msg) (nutriModel, tea.Cmd) {
+	if msg, ok := msg.(tea.KeyMsg); ok {
+		switch {
+		case key.Matches(msg, keys.ScrollUp):
+			m.detail.LineUp(3)
+			return m, nil
+		case key.Matches(msg, keys.ScrollDown):
+			m.detail.LineDown(3)
+			return m, nil
+		}
+	}
+
 	var cmd tea.Cmd
 	m.list, cmd = m.list.Update(msg)
 	selChanged := false
@@ -280,7 +292,7 @@ func makeBar(value, max float64, width int) string {
 	}
 	empty := width - filled
 	return lipgloss.NewStyle().Foreground(colorTeal).Render(strings.Repeat("█", filled)) +
-		lipgloss.NewStyle().Foreground(colorLine).Render(strings.Repeat("░", empty))
+		lipgloss.NewStyle().Foreground(colorSteel).Render(strings.Repeat("░", empty))
 }
 
 func formatNutriValue(v float64) string {
