@@ -11,8 +11,7 @@ Browse and export your Weight Watchers food log from the terminal.
 **Homebrew** (macOS and Linux):
 
 ```bash
-brew tap ali5ter/wwlog
-brew install wwlog
+brew install ali5ter/tap/wwlog
 ```
 
 **Binary** (macOS and Linux, no Go required):

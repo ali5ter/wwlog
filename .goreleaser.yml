@@ -28,7 +28,7 @@ brews:
     directory: Formula
     repository:
       owner: ali5ter
-      name: homebrew-wwlog
+      name: homebrew-tap
       token: "{{ .Env.HOMEBREW_TAP_TOKEN }}"
     homepage: https://github.com/ali5ter/wwlog
     description: Browse and export your Weight Watchers food log from the terminal
