@@ -3,6 +3,7 @@ package tui
 import (
 	"fmt"
 	"math"
+	"sort"
 	"strings"
 	"time"
 
@@ -15,6 +16,29 @@ import (
 	"github.com/charmbracelet/lipgloss"
 )
 
+type sortMode int
+
+const (
+	sortLogged  sortMode = iota // logged order (default)
+	sortByPts                   // highest WW points first
+	sortByKcal                  // highest calories first
+)
+
+func (s sortMode) label() string {
+	switch s {
+	case sortByPts:
+		return "sorted by points"
+	case sortByKcal:
+		return "sorted by kcal"
+	default:
+		return ""
+	}
+}
+
+func (s sortMode) next() sortMode {
+	return (s + 1) % 3
+}
+
 // logModel is the food log tab — a date list on the left, meal detail on the right.
 type logModel struct {
 	list        list.Model
@@ -26,6 +50,7 @@ type logModel struct {
 	width       int
 	height      int
 	selected    int
+	sort        sortMode
 	initialized bool
 }
 
@@ -73,7 +98,7 @@ func newLogModel(logs []*api.DayLog, width, height int) logModel {
 		initialized: true,
 	}
 	if len(logs) > 0 {
-		m.detail.SetContent(renderDay(logs[0], detailWidth-2))
+		m.detail.SetContent(renderDay(logs[0], detailWidth-2, m.sort))
 	}
 	return m
 }
@@ -113,6 +138,13 @@ func (m logModel) update(msg tea.Msg) (logModel, tea.Cmd) {
 			case key.Matches(msg, keys.ScrollDown):
 				m.detail.LineDown(3)
 				return m, nil
+			case key.Matches(msg, keys.Sort):
+				m.sort = m.sort.next()
+				if m.selected < len(m.logs) {
+					m.detail.SetContent(renderDay(m.logs[m.selected], m.detail.Width-2, m.sort))
+					m.detail.GotoTop()
+				}
+				return m, nil
 			}
 		}
 	}
@@ -123,7 +155,7 @@ func (m logModel) update(msg tea.Msg) (logModel, tea.Cmd) {
 	selChanged := false
 	if i := m.list.Index(); i != m.selected && i < len(m.logs) {
 		m.selected = i
-		m.detail.SetContent(renderDay(m.logs[i], m.detail.Width-2))
+		m.detail.SetContent(renderDay(m.logs[i], m.detail.Width-2, m.sort))
 		m.detail.GotoTop()
 		selChanged = true
 	}
@@ -154,7 +186,7 @@ func (m *logModel) applyFilter() {
 	m.list.SetItems(items)
 	m.selected = 0
 	if len(filtered) > 0 {
-		m.detail.SetContent(renderDay(filtered[0], m.detail.Width-2))
+		m.detail.SetContent(renderDay(filtered[0], m.detail.Width-2, m.sort))
 	} else {
 		m.detail.SetContent(styleFoodPortion.Render("No matching dates."))
 	}
@@ -195,7 +227,7 @@ func (m *logModel) resize(width, height int) {
 	m.detail.Width = detailWidth
 	m.detail.Height = height
 	if m.selected < len(m.logs) && len(m.logs) > 0 {
-		m.detail.SetContent(renderDay(m.logs[m.selected], detailWidth-2))
+		m.detail.SetContent(renderDay(m.logs[m.selected], detailWidth-2, m.sort))
 	}
 }
 
@@ -229,19 +261,41 @@ func renderPointsSummary(b *strings.Builder, pts api.DayPoints, contentWidth int
 	fmt.Fprintln(b)
 }
 
-func renderDay(day *api.DayLog, width int) string {
+func sortEntries(entries []api.FoodEntry, mode sortMode) []api.FoodEntry {
+	if mode == sortLogged || len(entries) == 0 {
+		return entries
+	}
+	cp := make([]api.FoodEntry, len(entries))
+	copy(cp, entries)
+	sort.Slice(cp, func(i, j int) bool {
+		switch mode {
+		case sortByPts:
+			return entryPoints(cp[i]) > entryPoints(cp[j])
+		case sortByKcal:
+			return cp[i].Nutrition().Calories > cp[j].Nutrition().Calories
+		}
+		return false
+	})
+	return cp
+}
+
+func renderDay(day *api.DayLog, width int, mode sortMode) string {
 	var b strings.Builder
 	sepWidth := width - 2
 	if sepWidth < 1 {
 		sepWidth = 1
 	}
-	fmt.Fprintf(&b, "%s\n", styleMealHeading.Render(formatDateLong(day.Date)))
+	heading := formatDateLong(day.Date)
+	if lbl := mode.label(); lbl != "" {
+		heading += styleFoodPortion.Render("  (" + lbl + ")")
+	}
+	fmt.Fprintf(&b, "%s\n", styleMealHeading.Render(heading))
 	fmt.Fprintf(&b, "%s\n\n", styleDim.Render(strings.Repeat("─", sepWidth)))
 	renderPointsSummary(&b, day.Points, width)
-	renderMeal(&b, "☀  Breakfast", day.Meals.Morning)
-	renderMeal(&b, "☁  Lunch", day.Meals.Midday)
-	renderMeal(&b, "☽  Dinner", day.Meals.Evening)
-	renderMeal(&b, "✦  Snacks", day.Meals.Anytime)
+	renderMeal(&b, "☀  Breakfast", sortEntries(day.Meals.Morning, mode))
+	renderMeal(&b, "☁  Lunch", sortEntries(day.Meals.Midday, mode))
+	renderMeal(&b, "☽  Dinner", sortEntries(day.Meals.Evening, mode))
+	renderMeal(&b, "✦  Snacks", sortEntries(day.Meals.Anytime, mode))
 	return b.String()
 }
 

@@ -21,6 +21,7 @@ const (
 	screenSplash appScreen = iota
 	screenLog
 	screenExport
+	screenDateRange
 )
 
 type tab int
@@ -68,9 +69,10 @@ type Model struct {
 	nutriModel     nutriModel
 	insightsModel  insightsModel
 
-	splashModel splashModel
-	exportModel exportModel
-	authObj     *auth.Auth
+	splashModel     splashModel
+	exportModel     exportModel
+	dateRangeModel  dateRangeModel
+	authObj         *auth.Auth
 	tld         string
 	start       string
 	end         string
@@ -126,6 +128,7 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		m.height = msg.Height
 		m.splashModel.resize(m.width, m.height)
 		m.exportModel.resize(m.width, m.height)
+		m.dateRangeModel.resize(m.width, m.height)
 		m.logModel.resize(m.width, m.contentHeight())
 		m.nutriModel.resize(m.width, m.contentHeight())
 		m.insightsModel.resize(m.width, m.contentHeight())
@@ -208,9 +211,45 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			m.exportModel, cmd = m.exportModel.update(msg)
 			if m.exportModel.form.State == huh.StateCompleted {
 				format := m.exportModel.form.GetString("format")
-				return m, runExport(format, m.start, m.end, m.logs)
+				dir := m.exportModel.form.GetString("dir")
+				return m, runExport(format, dir, m.start, m.end, m.logs)
 			}
 			if m.exportModel.form.State == huh.StateAborted {
+				m.screen = screenLog
+			}
+			return m, cmd
+		}
+		// Date range picker: esc cancels, ctrl+c quits, enter submits.
+		if m.screen == screenDateRange {
+			if msg.Type == tea.KeyCtrlC {
+				return m, tea.Quit
+			}
+			if msg.Type == tea.KeyEsc {
+				m.screen = screenLog
+				return m, nil
+			}
+			var cmd tea.Cmd
+			m.dateRangeModel, cmd = m.dateRangeModel.update(msg)
+			if m.dateRangeModel.form.State == huh.StateCompleted {
+				m.start = m.dateRangeModel.form.GetString("start")
+				m.end = m.dateRangeModel.form.GetString("end")
+				m.screen = screenLog
+				m.loading = true
+				authObj := m.authObj
+				tld := m.tld
+				start := m.start
+				end := m.end
+				return m, func() tea.Msg {
+					token, err := authObj.Token()
+					if err != nil {
+						return dataMsg{err: err}
+					}
+					client := api.New(token, tld)
+					logs, err := fetchLogs(client, start, end)
+					return dataMsg{logs: logs, client: client, err: err}
+				}
+			}
+			if m.dateRangeModel.form.State == huh.StateAborted {
 				m.screen = screenLog
 			}
 			return m, cmd
@@ -226,6 +265,10 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 				m.exportModel = newExportModel(m.width, m.height)
 				m.screen = screenExport
 				return m, m.exportModel.form.Init()
+			case key.Matches(msg, keys.DateRange):
+				m.dateRangeModel = newDateRangeModel(m.start, m.end, m.width, m.height)
+				m.screen = screenDateRange
+				return m, m.dateRangeModel.form.Init()
 			case key.Matches(msg, keys.TabNext):
 				m.activeTab = (m.activeTab + 1) % tab(len(tabNames))
 			case key.Matches(msg, keys.TabPrev):
@@ -238,7 +281,7 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		}
 	}
 
-	// Route non-key messages to splash or export screens.
+	// Route non-key messages to splash, export, or date-range screens.
 	if m.screen == screenSplash {
 		var cmd tea.Cmd
 		m.splashModel, cmd = m.splashModel.update(msg)
@@ -247,6 +290,11 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	if m.screen == screenExport {
 		var cmd tea.Cmd
 		m.exportModel, cmd = m.exportModel.update(msg)
+		return m, cmd
+	}
+	if m.screen == screenDateRange {
+		var cmd tea.Cmd
+		m.dateRangeModel, cmd = m.dateRangeModel.update(msg)
 		return m, cmd
 	}
 
@@ -272,6 +320,9 @@ func (m Model) View() string {
 	}
 	if m.screen == screenExport {
 		return m.exportModel.view()
+	}
+	if m.screen == screenDateRange {
+		return m.dateRangeModel.view()
 	}
 	if m.loading {
 		return m.loadingView()
@@ -330,6 +381,8 @@ func (m Model) statusView() string {
 		styleStatusKey.Render("↑/↓") + " navigate",
 		styleStatusKey.Render("⇧↑/⇧↓") + " scroll",
 		styleStatusKey.Render("/") + " filter",
+		styleStatusKey.Render("r") + " range",
+		styleStatusKey.Render("s") + " sort",
 		styleStatusKey.Render("^E") + " export",
 		styleStatusKey.Render("tab") + " switch",
 		styleStatusKey.Render("q") + " quit",

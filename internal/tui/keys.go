@@ -3,16 +3,18 @@ package tui
 import "github.com/charmbracelet/bubbles/key"
 
 type keyMap struct {
-	Up         key.Binding
-	Down       key.Binding
-	ScrollUp   key.Binding
-	ScrollDown key.Binding
-	Filter     key.Binding
-	Export     key.Binding
-	TabNext    key.Binding
-	TabPrev    key.Binding
-	Help       key.Binding
-	Quit       key.Binding
+	Up          key.Binding
+	Down        key.Binding
+	ScrollUp    key.Binding
+	ScrollDown  key.Binding
+	Filter      key.Binding
+	Export      key.Binding
+	DateRange   key.Binding
+	Sort        key.Binding
+	TabNext     key.Binding
+	TabPrev     key.Binding
+	Help        key.Binding
+	Quit        key.Binding
 }
 
 var keys = keyMap{
@@ -22,6 +24,8 @@ var keys = keyMap{
 	ScrollDown: key.NewBinding(key.WithKeys("shift+down"), key.WithHelp("⇧↓", "scroll down")),
 	Filter:     key.NewBinding(key.WithKeys("/"), key.WithHelp("/", "filter")),
 	Export:     key.NewBinding(key.WithKeys("ctrl+e"), key.WithHelp("^E", "export")),
+	DateRange:  key.NewBinding(key.WithKeys("r"), key.WithHelp("r", "range")),
+	Sort:       key.NewBinding(key.WithKeys("s"), key.WithHelp("s", "sort")),
 	TabNext:    key.NewBinding(key.WithKeys("tab"), key.WithHelp("tab", "next tab")),
 	TabPrev:    key.NewBinding(key.WithKeys("shift+tab"), key.WithHelp("⇧tab", "prev tab")),
 	Help:       key.NewBinding(key.WithKeys("?"), key.WithHelp("?", "help")),
