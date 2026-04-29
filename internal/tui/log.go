@@ -55,7 +55,7 @@ func newLogModel(logs []*api.DayLog, width, height int) logModel {
 	l.SetFilteringEnabled(false)
 
 	fi := textinput.New()
-	fi.Placeholder = "filter by date…"
+	fi.Placeholder = "filter by date (e.g. Jan, 04)"
 	fi.PromptStyle = styleFilterPrompt
 	fi.TextStyle = styleFilterText
 	fi.Prompt = "> "
@@ -220,9 +220,6 @@ func renderPointsSummary(b *strings.Builder, pts api.DayPoints, contentWidth int
 	if pts.ActivityEarned != 0 {
 		meta = append(meta, fmt.Sprintf("Activity +%.0f earned", pts.ActivityEarned))
 	}
-	if pts.VeggieServings > 0 {
-		meta = append(meta, fmt.Sprintf("Veggies %.0f ☁", pts.VeggieServings))
-	}
 	if pts.Weight > 0 {
 		meta = append(meta, fmt.Sprintf("Weight %.1f %s", pts.Weight, pts.WeightUnit))
 	}
@@ -285,11 +282,15 @@ func entryPoints(e api.FoodEntry) float64 {
 }
 
 func mealSummary(day *api.DayLog) string {
-	b := len(day.Meals.Morning)
-	l := len(day.Meals.Midday)
-	d := len(day.Meals.Evening)
-	s := len(day.Meals.Anytime)
-	return fmt.Sprintf("☀ %d  ☁ %d  ☽ %d  ✦ %d", b, l, d, s)
+	pts := day.Points
+	if pts.DailyTarget == 0 {
+		return ""
+	}
+	s := fmt.Sprintf("%.0fpt / %.0fpt", pts.DailyUsed, pts.DailyTarget)
+	if pts.Weight > 0 {
+		s += fmt.Sprintf("  ·  %.1f %s", pts.Weight, pts.WeightUnit)
+	}
+	return s
 }
 
 func formatDateShort(date string) string {

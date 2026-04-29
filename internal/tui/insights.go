@@ -84,7 +84,18 @@ func (m *insightsModel) render() string {
 	summary := api.ComputeRangeSummary(m.logs)
 	meals := api.MealStats(m.logs)
 	macros := api.AvgMacroBreakdown(m.logs)
-	foods := api.TopFoods(m.logs, 20)
+	// TopFoods returns all foods sorted by total points; filter zeros so only
+	// point-costing foods appear here (zero-point foods get their own section).
+	var foods []api.FoodStat
+	for _, f := range api.TopFoods(m.logs, 0) {
+		if f.TotalPts <= 0 {
+			break
+		}
+		foods = append(foods, f)
+		if len(foods) == 20 {
+			break
+		}
+	}
 
 	var b strings.Builder
 

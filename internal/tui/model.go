@@ -328,6 +328,7 @@ func (m Model) statusView() string {
 	}
 	hints := []string{
 		styleStatusKey.Render("↑/↓") + " navigate",
+		styleStatusKey.Render("⇧↑/⇧↓") + " scroll",
 		styleStatusKey.Render("/") + " filter",
 		styleStatusKey.Render("^E") + " export",
 		styleStatusKey.Render("tab") + " switch",
@@ -342,12 +343,7 @@ func (m Model) statusView() string {
 	case tabNutrition:
 		anim = m.animNutrition.View()
 	}
-	legend := lipgloss.NewStyle().Background(colorPanel).Foreground(colorMuted).Render("☀ breakfast  ☁ lunch  ☽ dinner  ✦ snacks")
-	right := lipgloss.JoinHorizontal(lipgloss.Center,
-		legend,
-		styleHeader.Render("   "),
-		lipgloss.NewStyle().Foreground(colorSteel).Render(anim),
-	)
+	right := lipgloss.NewStyle().Foreground(colorSteel).Render(anim)
 
 	contentWidth := m.width - 2
 	gap := contentWidth - lipgloss.Width(left) - lipgloss.Width(right)

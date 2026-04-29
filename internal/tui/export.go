@@ -38,7 +38,7 @@ func newExportModel(width, height int) exportModel {
 				Title("Export format").
 				Description("Choose how to save your food log").
 				Options(
-					huh.NewOption("Report    insights summary (text)", "report"),
+					huh.NewOption("Text      insights summary", "report"),
 					huh.NewOption("JSON      full structured data", "json"),
 					huh.NewOption("Markdown  readable daily report", "md"),
 					huh.NewOption("CSV       food log entries", "csv"),
@@ -64,7 +64,7 @@ func (m exportModel) view() string {
 	content := lipgloss.JoinVertical(lipgloss.Center,
 		styleSplashLogo.Render(asciiLogo), "",
 		styleSplashTitle.Render("Export your log"),
-		styleSplashSub.Render("File saved in the current directory"), "",
+		styleSplashSub.Render("Choose a format and press enter to save"), "",
 		m.form.View(), "",
 		styleSplashHint.Render("esc to cancel · ctrl+c to quit"),
 	)
