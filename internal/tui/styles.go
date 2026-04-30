@@ -1,6 +1,12 @@
 package tui
 
-import "github.com/charmbracelet/lipgloss"
+import (
+	"fmt"
+	"strconv"
+	"strings"
+
+	"github.com/charmbracelet/lipgloss"
+)
 
 func truncate(s string, max int) string {
 	r := []rune(s)
@@ -8,6 +14,24 @@ func truncate(s string, max int) string {
 		return s
 	}
 	return string(r[:max-1]) + "…"
+}
+
+// lerpColor linearly interpolates between two hex colours at position t ∈ [0,1].
+func lerpColor(a, b lipgloss.Color, t float64) lipgloss.Color {
+	ar, ag, ab := hexToRGB(string(a))
+	br, bg, bb := hexToRGB(string(b))
+	lerp := func(x, y uint8) uint8 {
+		return uint8(float64(x) + (float64(y)-float64(x))*t)
+	}
+	return lipgloss.Color(fmt.Sprintf("#%02X%02X%02X", lerp(ar, br), lerp(ag, bg), lerp(ab, bb)))
+}
+
+func hexToRGB(hex string) (uint8, uint8, uint8) {
+	hex = strings.TrimPrefix(hex, "#")
+	r, _ := strconv.ParseUint(hex[0:2], 16, 8)
+	g, _ := strconv.ParseUint(hex[2:4], 16, 8)
+	b, _ := strconv.ParseUint(hex[4:6], 16, 8)
+	return uint8(r), uint8(g), uint8(b)
 }
 
 // WW-inspired colour palette.
