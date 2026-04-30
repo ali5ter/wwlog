@@ -23,7 +23,7 @@ var keys = keyMap{
 	ScrollUp:   key.NewBinding(key.WithKeys("shift+up"), key.WithHelp("⇧↑", "scroll up")),
 	ScrollDown: key.NewBinding(key.WithKeys("shift+down"), key.WithHelp("⇧↓", "scroll down")),
 	Filter:     key.NewBinding(key.WithKeys("/"), key.WithHelp("/", "filter")),
-	Export:     key.NewBinding(key.WithKeys("ctrl+e"), key.WithHelp("^E", "export")),
+	Export:     key.NewBinding(key.WithKeys("e"), key.WithHelp("e", "export")),
 	DateRange:  key.NewBinding(key.WithKeys("r"), key.WithHelp("r", "range")),
 	Sort:       key.NewBinding(key.WithKeys("s"), key.WithHelp("s", "sort")),
 	TabNext:    key.NewBinding(key.WithKeys("tab"), key.WithHelp("tab", "next tab")),

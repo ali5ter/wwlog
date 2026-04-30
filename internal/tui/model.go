@@ -372,16 +372,16 @@ func (m Model) View() string {
 
 func (m Model) loadingView() string {
 	spinStr := styleSplashSub.Render(fmt.Sprintf("%s  Loading your food log…", m.spinner.View()))
-	// Use the same body-height reservation as the splash view so the logo
-	// sits at the same vertical position during loading as it did on the splash screen.
-	body := lipgloss.JoinVertical(lipgloss.Center, spinStr, "", styleSplashHint.Render("q to quit"))
-	paddedBody := lipgloss.Place(m.width, splashBodyH, lipgloss.Center, lipgloss.Top, body)
+	// Mirror the splash view structure exactly: paddedBody + hint appended outside,
+	// giving the same total content height so the logo sits at the same row.
+	paddedBody := lipgloss.Place(m.width, splashBodyH, lipgloss.Center, lipgloss.Top, spinStr)
 	content := lipgloss.JoinVertical(lipgloss.Center,
 		renderGradientLogo(), "",
 		styleSplashTitle.Render("wwlog  "+m.version),
 		styleSplashSub.Render("Weight Watchers food log browser"),
 		"",
 		paddedBody,
+		styleSplashHint.Render("q to quit"),
 	)
 	return lipgloss.Place(m.width, m.height, lipgloss.Center, lipgloss.Center, content)
 }
@@ -418,7 +418,7 @@ func (m Model) statusView() string {
 		styleStatusKey.Render("/") + " filter",
 		styleStatusKey.Render("r") + " range",
 		styleStatusKey.Render("s") + " sort",
-		styleStatusKey.Render("^E") + " export",
+		styleStatusKey.Render("e") + " export",
 		styleStatusKey.Render("tab") + " switch",
 		styleStatusKey.Render("q") + " quit",
 	}
