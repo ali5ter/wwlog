@@ -202,13 +202,19 @@ func (m splashModel) update(msg tea.Msg) (splashModel, tea.Cmd) {
 	return m, cmd
 }
 
-// renderGradientLogo renders the WW ASCII logo with a teal→purple→steel gradient.
+// renderGradientLogo renders the WW ASCII logo with a smooth RGB gradient
+// interpolated line-by-line from WW teal (#00B388) at the top to WW purple
+// (#6B4C9A) at the bottom.
 func renderGradientLogo() string {
 	lines := strings.Split(strings.TrimLeft(asciiLogo, "\n"), "\n")
-	palette := []lipgloss.Color{colorTeal, colorTeal, colorPurple, colorPurple, colorSteel, colorMuted}
+	n := len(lines) - 1
+	if n < 1 {
+		n = 1
+	}
 	rendered := make([]string, len(lines))
 	for i, line := range lines {
-		c := palette[i%len(palette)]
+		t := float64(i) / float64(n)
+		c := lerpColor(colorTeal, colorPurple, t)
 		rendered[i] = lipgloss.NewStyle().Foreground(c).Bold(true).Render(line)
 	}
 	return strings.Join(rendered, "\n")

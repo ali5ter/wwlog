@@ -11,6 +11,7 @@ import (
 	"github.com/charmbracelet/bubbles/viewport"
 	tea "github.com/charmbracelet/bubbletea"
 	"github.com/charmbracelet/lipgloss"
+	"github.com/guptarohit/asciigraph"
 )
 
 // rdv holds reference daily values used as bar maximums.
@@ -182,7 +183,7 @@ func (m *nutriModel) renderDetail() string {
 	if len(m.logs) > 1 {
 		fmt.Fprintf(&b, "\n%s\n\n", styleDim.Render(strings.Repeat("─", sepWidth)))
 		fmt.Fprintf(&b, "%s\n\n", styleDetailLabel.Render("Trends across date range"))
-		writeTrendTable(&b, m.logs, m.data)
+		writeTrendTable(&b, m.logs, m.data, vw)
 	}
 
 	return b.String()
@@ -206,79 +207,59 @@ func writeNutriBar(b *strings.Builder, label, unit string, value, max, avg float
 	fmt.Fprintf(b, "  %s%s%s  %s\n", labelCol, valCol, bar, avgCol)
 }
 
-func writeTrendTable(b *strings.Builder, logs []*api.DayLog, data map[string]*api.DayNutrition) {
+func writeTrendTable(b *strings.Builder, logs []*api.DayLog, data map[string]*api.DayNutrition, vw int) {
 	type series struct {
-		label  string
-		unit   string
-		values []float64
+		label string
+		unit  string
+		get   func(*api.DayNutrition) float64
 	}
-	cols := len(logs)
-	series4 := []series{
-		{label: "Calories", unit: "kcal"},
-		{label: "Protein", unit: "g"},
-		{label: "Carbs", unit: "g"},
-		{label: "Fat", unit: "g"},
+	metrics := []series{
+		{"Calories", "kcal", func(d *api.DayNutrition) float64 { return d.Calories }},
+		{"Protein", "g", func(d *api.DayNutrition) float64 { return d.Protein }},
+		{"Carbs", "g", func(d *api.DayNutrition) float64 { return d.Carbs }},
+		{"Fat", "g", func(d *api.DayNutrition) float64 { return d.Fat }},
 	}
-	for i := range series4 {
-		series4[i].values = make([]float64, cols)
+
+	n := len(logs)
+	// Y-axis labels for Calories are up to 4 digits wide + " │" = ~8 chars offset.
+	// Leave a generous margin so chart fits within vw.
+	plotW := vw - 14
+	if plotW < 8 {
+		plotW = 8
 	}
-	for j, day := range logs {
-		if dn, ok := data[day.Date]; ok {
-			series4[0].values[j] = dn.Calories
-			series4[1].values[j] = dn.Protein
-			series4[2].values[j] = dn.Carbs
-			series4[3].values[j] = dn.Fat
+
+	dateLabel := func(v float64) string {
+		i := int(math.Round(v))
+		if i < 0 || i >= len(logs) {
+			return ""
 		}
-	}
-
-	labelW := 10
-	colW := 6
-
-	// Date header row.
-	var hdr strings.Builder
-	hdr.WriteString(strings.Repeat(" ", labelW+2))
-	for _, day := range logs {
-		dd := day.Date
-		if len(dd) >= 10 {
-			dd = dd[8:10]
+		d := logs[i].Date
+		if len(d) >= 10 {
+			return d[5:10] // "MM-DD"
 		}
-		hdr.WriteString(lipgloss.NewStyle().Width(colW).Align(lipgloss.Center).Render(styleFoodPortion.Render(dd)))
+		return d
 	}
-	fmt.Fprintf(b, "%s\n", hdr.String())
 
-	blocks := []rune("▁▂▃▄▅▆▇█")
-	for _, s := range series4 {
-		var maxV float64
-		for _, v := range s.values {
-			if v > maxV {
-				maxV = v
+	for _, m := range metrics {
+		vals := make([]float64, n)
+		for i, day := range logs {
+			if dn, ok := data[day.Date]; ok {
+				vals[i] = m.get(dn)
 			}
 		}
-		// Sparkline row.
-		var spark strings.Builder
-		for _, v := range s.values {
-			idx := 0
-			if maxV > 0 {
-				idx = int(v / maxV * float64(len(blocks)-1))
-			}
-			if idx >= len(blocks) {
-				idx = len(blocks) - 1
-			}
-			spark.WriteString(lipgloss.NewStyle().Width(colW).Align(lipgloss.Center).Render(
-				lipgloss.NewStyle().Foreground(colorTeal).Render(string(blocks[idx])),
-			))
-		}
-		labelPart := lipgloss.NewStyle().Width(labelW).Render(styleDetailLabel.Render(s.label))
-		fmt.Fprintf(b, "  %s%s\n", labelPart, spark.String())
-
-		// Values row.
-		var vals strings.Builder
-		for _, v := range s.values {
-			vals.WriteString(lipgloss.NewStyle().Width(colW).Align(lipgloss.Center).Render(
-				styleFoodPortion.Render(formatNutriValue(v)),
-			))
-		}
-		fmt.Fprintf(b, "  %s%s  %s\n\n", strings.Repeat(" ", labelW), vals.String(), styleFoodPortion.Render(s.unit))
+		chart := asciigraph.Plot(vals,
+			asciigraph.Height(4),
+			asciigraph.Width(plotW),
+			asciigraph.SeriesColors(asciigraph.MediumAquamarine),
+			asciigraph.LabelColor(asciigraph.SlateGray),
+			asciigraph.AxisColor(asciigraph.SlateGray),
+			asciigraph.Caption(fmt.Sprintf("%s (%s)", m.label, m.unit)),
+			asciigraph.CaptionColor(asciigraph.LightSlateGray),
+			asciigraph.XAxisRange(0, float64(n-1)),
+			asciigraph.XAxisTickCount(n),
+			asciigraph.XAxisValueFormatter(dateLabel),
+		)
+		fmt.Fprintf(b, "%s\n\n", chart)
 	}
 }
 
