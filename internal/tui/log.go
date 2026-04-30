@@ -5,7 +5,6 @@ import (
 	"math"
 	"sort"
 	"strings"
-	"time"
 
 	"github.com/ali5ter/wwlog/internal/api"
 	"github.com/charmbracelet/bubbles/key"
@@ -51,33 +50,30 @@ type logModel struct {
 	height      int
 	selected    int
 	sort        sortMode
+	locale      locale
 	initialized bool
 }
 
 type dateItem struct {
-	log *api.DayLog
+	log    *api.DayLog
+	locale locale
 }
 
-func (d dateItem) Title() string       { return formatDateShort(d.log.Date) }
-func (d dateItem) Description() string { return mealSummary(d.log) }
+func (d dateItem) Title() string       { return d.locale.dateShort(d.log.Date) }
+func (d dateItem) Description() string { return mealSummary(d.log, d.locale) }
 func (d dateItem) FilterValue() string { return d.log.Date }
 
-func newLogModel(logs []*api.DayLog, width, height int) logModel {
+func newLogModel(logs []*api.DayLog, width, height int, loc locale) logModel {
 	listWidth := width / 3
 	detailWidth := width - listWidth
 	listHeight := height - 2 // filter bar + separator
 
 	items := make([]list.Item, len(logs))
 	for i, l := range logs {
-		items[i] = dateItem{log: l}
+		items[i] = dateItem{log: l, locale: loc}
 	}
 
-	l := list.New(items, list.NewDefaultDelegate(), listWidth, listHeight)
-	l.Title = "Dates"
-	l.Styles.Title = styleMealHeading
-	l.SetShowStatusBar(false)
-	l.SetShowHelp(false)
-	l.SetFilteringEnabled(false)
+	l := newDateList(items, listWidth, listHeight)
 
 	fi := textinput.New()
 	fi.Placeholder = "filter by date (e.g. Jan, 04)"
@@ -95,10 +91,11 @@ func newLogModel(logs []*api.DayLog, width, height int) logModel {
 		logs:        logs,
 		width:       width,
 		height:      height,
+		locale:      loc,
 		initialized: true,
 	}
 	if len(logs) > 0 {
-		m.detail.SetContent(renderDay(logs[0], detailWidth-2, m.sort))
+		m.detail.SetContent(renderDay(logs[0], detailWidth-2, m.sort, loc))
 	}
 	return m
 }
@@ -141,7 +138,7 @@ func (m logModel) update(msg tea.Msg) (logModel, tea.Cmd) {
 			case key.Matches(msg, keys.Sort):
 				m.sort = m.sort.next()
 				if m.selected < len(m.logs) {
-					m.detail.SetContent(renderDay(m.logs[m.selected], m.detail.Width-2, m.sort))
+					m.detail.SetContent(renderDay(m.logs[m.selected], m.detail.Width-2, m.sort, m.locale))
 					m.detail.GotoTop()
 				}
 				return m, nil
@@ -155,7 +152,7 @@ func (m logModel) update(msg tea.Msg) (logModel, tea.Cmd) {
 	selChanged := false
 	if i := m.list.Index(); i != m.selected && i < len(m.logs) {
 		m.selected = i
-		m.detail.SetContent(renderDay(m.logs[i], m.detail.Width-2, m.sort))
+		m.detail.SetContent(renderDay(m.logs[i], m.detail.Width-2, m.sort, m.locale))
 		m.detail.GotoTop()
 		selChanged = true
 	}
@@ -180,19 +177,19 @@ func (m *logModel) applyFilter() {
 	for _, l := range m.allLogs {
 		if q == "" ||
 			strings.Contains(strings.ToLower(l.Date), q) ||
-			strings.Contains(strings.ToLower(formatDateShort(l.Date)), q) {
+			strings.Contains(strings.ToLower(m.locale.dateShort(l.Date)), q) {
 			filtered = append(filtered, l)
 		}
 	}
 	m.logs = filtered
 	items := make([]list.Item, len(filtered))
 	for i, l := range filtered {
-		items[i] = dateItem{log: l}
+		items[i] = dateItem{log: l, locale: m.locale}
 	}
 	m.list.SetItems(items)
 	m.selected = 0
 	if len(filtered) > 0 {
-		m.detail.SetContent(renderDay(filtered[0], m.detail.Width-2, m.sort))
+		m.detail.SetContent(renderDay(filtered[0], m.detail.Width-2, m.sort, m.locale))
 	} else {
 		m.detail.SetContent(styleFoodPortion.Render("No matching dates."))
 	}
@@ -233,11 +230,11 @@ func (m *logModel) resize(width, height int) {
 	m.detail.Width = detailWidth
 	m.detail.Height = height
 	if m.selected < len(m.logs) && len(m.logs) > 0 {
-		m.detail.SetContent(renderDay(m.logs[m.selected], detailWidth-2, m.sort))
+		m.detail.SetContent(renderDay(m.logs[m.selected], detailWidth-2, m.sort, m.locale))
 	}
 }
 
-func renderPointsSummary(b *strings.Builder, pts api.DayPoints, contentWidth int) {
+func renderPointsSummary(b *strings.Builder, pts api.DayPoints, contentWidth int, loc locale) {
 	if pts.DailyTarget == 0 {
 		return
 	}
@@ -259,7 +256,7 @@ func renderPointsSummary(b *strings.Builder, pts api.DayPoints, contentWidth int
 		meta = append(meta, fmt.Sprintf("Activity +%.0f earned", pts.ActivityEarned))
 	}
 	if pts.Weight > 0 {
-		meta = append(meta, fmt.Sprintf("Weight %.1f %s", pts.Weight, pts.WeightUnit))
+		meta = append(meta, fmt.Sprintf("Weight %.1f %s", pts.Weight, loc.weightUnit(pts.WeightUnit)))
 	}
 	if len(meta) > 0 {
 		fmt.Fprintf(b, "  %s\n", styleFoodPortion.Render(strings.Join(meta, "  ·  ")))
@@ -285,19 +282,19 @@ func sortEntries(entries []api.FoodEntry, mode sortMode) []api.FoodEntry {
 	return cp
 }
 
-func renderDay(day *api.DayLog, width int, mode sortMode) string {
+func renderDay(day *api.DayLog, width int, mode sortMode, loc locale) string {
 	var b strings.Builder
 	sepWidth := width - 2
 	if sepWidth < 1 {
 		sepWidth = 1
 	}
-	heading := formatDateLong(day.Date)
+	heading := loc.dateLong(day.Date)
 	if lbl := mode.label(); lbl != "" {
 		heading += styleFoodPortion.Render("  (" + lbl + ")")
 	}
 	fmt.Fprintf(&b, "%s\n", styleMealHeading.Render(heading))
 	fmt.Fprintf(&b, "%s\n\n", styleDim.Render(strings.Repeat("─", sepWidth)))
-	renderPointsSummary(&b, day.Points, width)
+	renderPointsSummary(&b, day.Points, width, loc)
 	renderMeal(&b, "☀  Breakfast", sortEntries(day.Meals.Morning, mode))
 	renderMeal(&b, "☁  Lunch", sortEntries(day.Meals.Midday, mode))
 	renderMeal(&b, "☽  Dinner", sortEntries(day.Meals.Evening, mode))
@@ -341,32 +338,16 @@ func entryPoints(e api.FoodEntry) float64 {
 	return math.Round(e.PointsPrecise)
 }
 
-func mealSummary(day *api.DayLog) string {
+func mealSummary(day *api.DayLog, loc locale) string {
 	pts := day.Points
 	if pts.DailyTarget == 0 {
 		return ""
 	}
 	s := fmt.Sprintf("%.0fpt / %.0fpt", pts.DailyUsed, pts.DailyTarget)
 	if pts.Weight > 0 {
-		s += fmt.Sprintf("  ·  %.1f %s", pts.Weight, pts.WeightUnit)
+		s += fmt.Sprintf("  ·  %.1f %s", pts.Weight, loc.weightUnit(pts.WeightUnit))
 	}
 	return s
-}
-
-func formatDateShort(date string) string {
-	t, err := time.Parse("2006-01-02", date)
-	if err != nil {
-		return date
-	}
-	return t.Format("Mon, 2 Jan")
-}
-
-func formatDateLong(date string) string {
-	t, err := time.Parse("2006-01-02", date)
-	if err != nil {
-		return date
-	}
-	return t.Format("Monday 2 January 2006")
 }
 
 func formatPortion(size float64) string {

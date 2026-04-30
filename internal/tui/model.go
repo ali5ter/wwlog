@@ -40,6 +40,8 @@ type dataMsg struct {
 	err    error
 }
 
+type versionMsg struct{ latest string }
+
 // Tab-contextual footer animations.
 var (
 	animLogSpinner = spinner.Spinner{
@@ -73,12 +75,13 @@ type Model struct {
 	exportModel     exportModel
 	dateRangeModel  dateRangeModel
 	authObj         *auth.Auth
-	tld         string
-	start       string
-	end         string
-	version     string
-	client      *api.Client
-	statusMsg   string
+	tld           string
+	start         string
+	end           string
+	version       string
+	latestVersion string
+	client        *api.Client
+	statusMsg     string
 }
 
 // Run initialises and starts the TUI, blocking until the user quits.
@@ -143,15 +146,18 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		tld := m.tld
 		start := msg.start
 		end := msg.end
-		return m, func() tea.Msg {
-			token, err := authObj.Token()
-			if err != nil {
-				return dataMsg{err: err}
-			}
-			client := api.New(token, tld)
-			logs, err := fetchLogs(client, start, end)
-			return dataMsg{logs: logs, client: client, err: err}
-		}
+		return m, tea.Batch(
+			func() tea.Msg {
+				token, err := authObj.Token()
+				if err != nil {
+					return dataMsg{err: err}
+				}
+				client := api.New(token, tld)
+				logs, err := fetchLogs(client, start, end)
+				return dataMsg{logs: logs, client: client, err: err}
+			},
+			func() tea.Msg { return versionMsg{latest: api.FetchLatestVersion()} },
+		)
 
 	case dataMsg:
 		m.loading = false
@@ -165,9 +171,14 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		}
 		// Nutrition is embedded in each food entry — compute synchronously, no extra API calls.
 		nutrition := api.ComputeAllNutrition(m.logs)
-		m.logModel = newLogModel(m.logs, m.width, m.contentHeight())
-		m.nutriModel = newNutriModel(m.logs, nutrition, m.width, m.contentHeight())
+		loc := newLocale(m.tld)
+		m.logModel = newLogModel(m.logs, m.width, m.contentHeight(), loc)
+		m.nutriModel = newNutriModel(m.logs, nutrition, m.width, m.contentHeight(), loc)
 		m.insightsModel = newInsightsModel(m.logs, m.width, m.contentHeight())
+		return m, nil
+
+	case versionMsg:
+		m.latestVersion = msg.latest
 		return m, nil
 
 	case exportDoneMsg:
@@ -415,23 +426,37 @@ func (m Model) statusView() string {
 	hints := []string{
 		styleStatusKey.Render("↑/↓") + " navigate",
 		styleStatusKey.Render("⇧↑/↓") + " scroll",
-		styleStatusKey.Render("/") + " filter",
-		styleStatusKey.Render("r") + " range",
-		styleStatusKey.Render("s") + " sort",
-		styleStatusKey.Render("e") + " export",
-		styleStatusKey.Render("tab") + " switch",
-		styleStatusKey.Render("q") + " quit",
 	}
+	if m.activeTab == tabLog {
+		hints = append(hints, styleStatusKey.Render("/")+" filter")
+	}
+	hints = append(hints,
+		styleStatusKey.Render("r")+" range",
+		styleStatusKey.Render("s")+" sort",
+		styleStatusKey.Render("e")+" export",
+		styleStatusKey.Render("tab")+" switch",
+		styleStatusKey.Render("q")+" quit",
+	)
 	left := strings.Join(hints, "  ")
 
-	var anim string
-	switch m.activeTab {
-	case tabLog:
-		anim = m.animLog.View()
-	case tabNutrition:
-		anim = m.animNutrition.View()
+	var right string
+	currentNorm := strings.TrimPrefix(m.version, "v")
+	if m.latestVersion != "" && m.latestVersion != currentNorm {
+		right = lipgloss.NewStyle().
+			Background(colorTeal).
+			Foreground(colorPanel).
+			Padding(0, 1).
+			Render("↑ v" + m.latestVersion + " available")
+	} else {
+		var anim string
+		switch m.activeTab {
+		case tabLog:
+			anim = m.animLog.View()
+		case tabNutrition:
+			anim = m.animNutrition.View()
+		}
+		right = lipgloss.NewStyle().Foreground(colorSteel).Render(anim)
 	}
-	right := lipgloss.NewStyle().Foreground(colorSteel).Render(anim)
 
 	contentWidth := m.width - 2
 	gap := contentWidth - lipgloss.Width(left) - lipgloss.Width(right)
