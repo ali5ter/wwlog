@@ -4,6 +4,8 @@ package cmd
 import (
 	"fmt"
 	"os"
+	"path/filepath"
+	"strings"
 	"time"
 
 	"github.com/ali5ter/wwlog/config"
@@ -25,6 +27,8 @@ var (
 	flagLogout bool
 	flagTLD    string
 	flagRaw    bool
+	flagExport string
+	flagOutput string
 	version    = "0.1.0"
 )
 
@@ -53,6 +57,8 @@ func init() {
 	rootCmd.Flags().StringVarP(&flagTLD, "tld", "l", "com", "WW top-level domain (com, co.uk, etc.)")
 	rootCmd.Flags().BoolVar(&flagRaw, "raw", false, "Dump raw API JSON for the start date (for API inspection)")
 	_ = rootCmd.Flags().MarkHidden("raw")
+	rootCmd.Flags().StringVar(&flagExport, "export", "", "Export format: json, csv, markdown, report")
+	rootCmd.Flags().StringVarP(&flagOutput, "output", "o", "", "Output file or directory (default: reports/)")
 }
 
 func run(cmd *cobra.Command, _ []string) error {
@@ -115,6 +121,60 @@ func run(cmd *cobra.Command, _ []string) error {
 		return nil
 	}
 
+	// Export mode: write a file without launching the TUI.
+	if flagExport != "" {
+		extMap := map[string]string{
+			"json":     "json",
+			"csv":      "csv",
+			"markdown": "md",
+			"report":   "txt",
+		}
+		ext, ok := extMap[flagExport]
+		if !ok {
+			return fmt.Errorf("unknown export format %q — use json, csv, markdown, or report", flagExport)
+		}
+		start := flagStart
+		if start == "" {
+			start = time.Now().Format("2006-01-02")
+		}
+		end := flagEnd
+		if end == "" {
+			end = time.Now().Format("2006-01-02")
+		}
+		token, err := authenticator.Token()
+		if err != nil {
+			return fmt.Errorf("%w\nRun 'wwlog --login' to authenticate", err)
+		}
+		logs, err := loadLogs(api.New(token, tld), start, end)
+		if err != nil {
+			return err
+		}
+		dest, err := resolveExportPath(flagOutput, start, end, ext)
+		if err != nil {
+			return fmt.Errorf("resolve output path: %w", err)
+		}
+		f, err := os.Create(dest)
+		if err != nil {
+			return fmt.Errorf("create %s: %w", dest, err)
+		}
+		defer f.Close()
+		switch flagExport {
+		case "json":
+			err = pipeline.WriteJSON(f, logs)
+		case "csv":
+			err = pipeline.WriteLogCSV(f, logs)
+		case "markdown":
+			err = pipeline.EmitMarkdown(f, logs)
+		case "report":
+			err = pipeline.EmitTextReport(f, logs)
+		}
+		if err != nil {
+			return fmt.Errorf("write %s: %w", dest, err)
+		}
+		fmt.Fprintf(os.Stderr, "Saved %s\n", dest)
+		return nil
+	}
+
 	// Pipeline mode: requires explicit dates; defaults to today if omitted.
 	if flagJSON || flagReport || flagNoTTY || !isTTY() {
 		start := flagStart
@@ -164,4 +224,29 @@ func readPassword() (string, error) {
 	b, err := term.ReadPassword(int(os.Stdin.Fd()))
 	fmt.Fprintln(os.Stderr)
 	return string(b), err
+}
+
+// resolveExportPath returns the full destination file path for an export.
+// If output names an existing directory (or ends with /) the generated
+// filename is appended. If output is empty, reports/ in the cwd is used
+// (created on demand). Otherwise output is treated as the literal file path.
+func resolveExportPath(output, start, end, ext string) (string, error) {
+	filename := fmt.Sprintf("wwlog-%s_%s.%s", start, end, ext)
+	if output == "" {
+		if err := os.MkdirAll("reports", 0o755); err != nil {
+			return "", err
+		}
+		return filepath.Join("reports", filename), nil
+	}
+	expanded := output
+	if strings.HasPrefix(expanded, "~/") {
+		if home, err := os.UserHomeDir(); err == nil {
+			expanded = filepath.Join(home, expanded[2:])
+		}
+	}
+	info, err := os.Stat(expanded)
+	if err == nil && info.IsDir() {
+		return filepath.Join(expanded, filename), nil
+	}
+	return expanded, nil
 }
