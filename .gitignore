@@ -1,5 +1,6 @@
 wwlog
 dist/
+reports/
 *.swp
 *~
 .env
