@@ -106,6 +106,24 @@ func DateRange(start, end string) ([]string, error) {
 	return dates, nil
 }
 
+// FetchLatestVersion hits the GitHub Releases API and returns the latest
+// published version tag (without the leading "v"), e.g. "1.2.3".
+// Returns an empty string on any error so callers can treat it as optional.
+func FetchLatestVersion() string {
+	resp, err := http.Get("https://api.github.com/repos/ali5ter/wwlog/releases/latest")
+	if err != nil {
+		return ""
+	}
+	defer resp.Body.Close()
+	var v struct {
+		TagName string `json:"tag_name"`
+	}
+	if err := json.NewDecoder(resp.Body).Decode(&v); err != nil {
+		return ""
+	}
+	return strings.TrimPrefix(v.TagName, "v")
+}
+
 // FetchDayRaw returns the raw JSON response body for a single date. Used for
 // API inspection — run with --raw to see all available fields.
 func (c *Client) FetchDayRaw(date string) ([]byte, error) {

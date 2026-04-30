@@ -5,8 +5,33 @@ import (
 	"strconv"
 	"strings"
 
+	"github.com/charmbracelet/bubbles/key"
+	"github.com/charmbracelet/bubbles/list"
 	"github.com/charmbracelet/lipgloss"
 )
+
+// newDateList returns a list.Model pre-configured with the WW palette and the
+// app's key-binding policy (list quit disabled — the top-level model owns it).
+func newDateList(items []list.Item, width, height int) list.Model {
+	del := list.NewDefaultDelegate()
+	del.Styles.NormalTitle = lipgloss.NewStyle().Foreground(colorText).Padding(0, 0, 0, 2)
+	del.Styles.NormalDesc = del.Styles.NormalTitle.Foreground(colorMuted)
+	del.Styles.SelectedTitle = lipgloss.NewStyle().
+		Border(lipgloss.NormalBorder(), false, false, false, true).
+		BorderForeground(colorTeal).
+		Foreground(colorTeal).
+		Padding(0, 0, 0, 1)
+	del.Styles.SelectedDesc = del.Styles.SelectedTitle.Foreground(colorMuted)
+
+	l := list.New(items, del, width, height)
+	l.Title = "Dates"
+	l.Styles.Title = styleMealHeading
+	l.SetShowStatusBar(false)
+	l.SetShowHelp(false)
+	l.SetFilteringEnabled(false)
+	l.KeyMap.Quit = key.NewBinding() // top-level model handles q and ctrl+c
+	return l
+}
 
 func truncate(s string, max int) string {
 	r := []rune(s)

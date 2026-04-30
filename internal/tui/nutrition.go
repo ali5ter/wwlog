@@ -49,12 +49,7 @@ func newNutriModel(logs []*api.DayLog, data map[string]*api.DayNutrition, width,
 		items[i] = dateItem{log: l, locale: loc}
 	}
 
-	l := list.New(items, list.NewDefaultDelegate(), listWidth, listHeight)
-	l.Title = "Dates"
-	l.Styles.Title = styleMealHeading
-	l.SetShowStatusBar(false)
-	l.SetShowHelp(false)
-	l.SetFilteringEnabled(false)
+	l := newDateList(items, listWidth, listHeight)
 
 	vp := viewport.New(width-listWidth, height)
 
@@ -241,6 +236,7 @@ func writeTrendTable(b *strings.Builder, logs []*api.DayLog, data map[string]*ap
 		}
 		return d
 	}
+	ticks := min(n, 7) // cap so labels don't crowd on wide date ranges
 
 	for _, m := range metrics {
 		vals := make([]float64, n)
@@ -258,7 +254,7 @@ func writeTrendTable(b *strings.Builder, logs []*api.DayLog, data map[string]*ap
 			asciigraph.Caption(fmt.Sprintf("%s (%s)", m.label, m.unit)),
 			asciigraph.CaptionColor(asciigraph.LightSlateGray),
 			asciigraph.XAxisRange(0, float64(n-1)),
-			asciigraph.XAxisTickCount(n),
+			asciigraph.XAxisTickCount(ticks),
 			asciigraph.XAxisValueFormatter(dateLabel),
 		)
 		fmt.Fprintf(b, "%s\n\n", chart)

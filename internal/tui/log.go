@@ -73,12 +73,7 @@ func newLogModel(logs []*api.DayLog, width, height int, loc locale) logModel {
 		items[i] = dateItem{log: l, locale: loc}
 	}
 
-	l := list.New(items, list.NewDefaultDelegate(), listWidth, listHeight)
-	l.Title = "Dates"
-	l.Styles.Title = styleMealHeading
-	l.SetShowStatusBar(false)
-	l.SetShowHelp(false)
-	l.SetFilteringEnabled(false)
+	l := newDateList(items, listWidth, listHeight)
 
 	fi := textinput.New()
 	fi.Placeholder = "filter by date (e.g. Jan, 04)"
