@@ -228,6 +228,18 @@ func writeTrendTable(b *strings.Builder, logs []*api.DayLog, data map[string]*ap
 		plotW = 8
 	}
 
+	dateLabel := func(v float64) string {
+		i := int(math.Round(v))
+		if i < 0 || i >= len(logs) {
+			return ""
+		}
+		d := logs[i].Date
+		if len(d) >= 10 {
+			return d[5:10] // "MM-DD"
+		}
+		return d
+	}
+
 	for _, m := range metrics {
 		vals := make([]float64, n)
 		for i, day := range logs {
@@ -243,6 +255,9 @@ func writeTrendTable(b *strings.Builder, logs []*api.DayLog, data map[string]*ap
 			asciigraph.AxisColor(asciigraph.SlateGray),
 			asciigraph.Caption(fmt.Sprintf("%s (%s)", m.label, m.unit)),
 			asciigraph.CaptionColor(asciigraph.LightSlateGray),
+			asciigraph.XAxisRange(0, float64(n-1)),
+			asciigraph.XAxisTickCount(n),
+			asciigraph.XAxisValueFormatter(dateLabel),
 		)
 		fmt.Fprintf(b, "%s\n\n", chart)
 	}
