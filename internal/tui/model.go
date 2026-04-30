@@ -165,8 +165,9 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		}
 		// Nutrition is embedded in each food entry — compute synchronously, no extra API calls.
 		nutrition := api.ComputeAllNutrition(m.logs)
-		m.logModel = newLogModel(m.logs, m.width, m.contentHeight())
-		m.nutriModel = newNutriModel(m.logs, nutrition, m.width, m.contentHeight())
+		loc := newLocale(m.tld)
+		m.logModel = newLogModel(m.logs, m.width, m.contentHeight(), loc)
+		m.nutriModel = newNutriModel(m.logs, nutrition, m.width, m.contentHeight(), loc)
 		m.insightsModel = newInsightsModel(m.logs, m.width, m.contentHeight())
 		return m, nil
 

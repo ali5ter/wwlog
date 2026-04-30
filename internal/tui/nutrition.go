@@ -36,16 +36,17 @@ type nutriModel struct {
 	width       int
 	height      int
 	selected    int
+	locale      locale
 	initialized bool
 }
 
-func newNutriModel(logs []*api.DayLog, data map[string]*api.DayNutrition, width, height int) nutriModel {
+func newNutriModel(logs []*api.DayLog, data map[string]*api.DayNutrition, width, height int, loc locale) nutriModel {
 	listWidth := width / 3
 	listHeight := height - 2
 
 	items := make([]list.Item, len(logs))
 	for i, l := range logs {
-		items[i] = dateItem{log: l}
+		items[i] = dateItem{log: l, locale: loc}
 	}
 
 	l := list.New(items, list.NewDefaultDelegate(), listWidth, listHeight)
@@ -65,6 +66,7 @@ func newNutriModel(logs []*api.DayLog, data map[string]*api.DayNutrition, width,
 		avgs:        computeAverages(data, logs),
 		width:       width,
 		height:      height,
+		locale:      loc,
 		initialized: true,
 	}
 	m.detail.SetContent(m.renderDetail())
@@ -158,11 +160,11 @@ func (m *nutriModel) renderDetail() string {
 	}
 
 	var b strings.Builder
-	fmt.Fprintf(&b, "%s\n", styleMealHeading.Render(formatDateLong(day.Date)))
+	fmt.Fprintf(&b, "%s\n", styleMealHeading.Render(m.locale.dateLong(day.Date)))
 	fmt.Fprintf(&b, "%s\n\n", styleDim.Render(strings.Repeat("─", sepWidth)))
 
 	// Points summary.
-	renderPointsSummary(&b, day.Points, vw)
+	renderPointsSummary(&b, day.Points, vw, m.locale)
 
 	fmt.Fprintf(&b, "%s\n\n", styleDim.Render(strings.Repeat("─", sepWidth)))
 
