@@ -214,29 +214,89 @@ func renderGradientLogo() string {
 	return strings.Join(rendered, "\n")
 }
 
-func (m splashModel) view() string {
-	logoStr := renderGradientLogo()
-	titleStr := styleSplashTitle.Render("wwlog  " + m.version)
-	subStr := styleSplashSub.Render("Weight Watchers food log browser")
+// splashBodyH is the reserved height for the body area (form or spinner).
+// Keeping this constant ensures the logo never shifts position between phases.
+const splashBodyH = 16
 
-	var middle string
+func (m splashModel) view() string {
+	var body string
 	switch m.phase {
 	case splashChecking:
-		middle = styleSplashSub.Render(m.spinner.View() + "  Checking credentials…")
+		body = styleSplashSub.Render(m.spinner.View() + "  Checking credentials…")
 	default:
 		if m.form != nil {
-			middle = m.form.View()
+			body = m.form.View()
 		}
 	}
-
-	parts := []string{logoStr, "", titleStr, subStr, ""}
 	if m.err != "" {
-		parts = append(parts, styleError.Render("  "+m.err), "")
+		body = lipgloss.JoinVertical(lipgloss.Center, styleError.Render("  "+m.err), "", body)
 	}
-	parts = append(parts, middle)
-	parts = append(parts, "", styleSplashHint.Render("ctrl+c to quit"))
 
-	content := lipgloss.JoinVertical(lipgloss.Center, parts...)
+	// Pad body to a fixed height so the logo's vertical position is identical
+	// across all phases (spinner → form transitions don't shift the logo).
+	paddedBody := lipgloss.Place(m.width, splashBodyH, lipgloss.Center, lipgloss.Top, body)
+
+	content := lipgloss.JoinVertical(lipgloss.Center,
+		renderGradientLogo(), "",
+		styleSplashTitle.Render("wwlog  "+m.version),
+		styleSplashSub.Render("Weight Watchers food log browser"),
+		"",
+		paddedBody,
+		styleSplashHint.Render("ctrl+c to quit"),
+	)
+	return lipgloss.Place(m.width, m.height, lipgloss.Center, lipgloss.Center, content)
+}
+
+// dateRangeModel is the in-TUI date range picker — same form as the splash
+// date step, but presented as an overlay from the main log screen.
+type dateRangeModel struct {
+	form   *huh.Form
+	width  int
+	height int
+}
+
+func newDateRangeModel(start, end string, width, height int) dateRangeModel {
+	w := width / 2
+	if w < 44 {
+		w = 44
+	}
+	if w > 72 {
+		w = 72
+	}
+	// huh forms capture the *string values at form-init time, so we need local
+	// copies that the form fields can write into.
+	s, e := start, end
+	form := huh.NewForm(
+		huh.NewGroup(
+			huh.NewInput().Key("start").Title("From").Placeholder("YYYY-MM-DD").Value(&s).Validate(validateDate),
+			huh.NewInput().Key("end").Title("To").Placeholder("YYYY-MM-DD").Value(&e).Validate(validateDate),
+		),
+	).WithTheme(wwHuhTheme()).WithWidth(w).WithShowHelp(true)
+	return dateRangeModel{form: form, width: width, height: height}
+}
+
+func (m *dateRangeModel) resize(width, height int) {
+	m.width = width
+	m.height = height
+}
+
+func (m dateRangeModel) update(msg tea.Msg) (dateRangeModel, tea.Cmd) {
+	model, cmd := m.form.Update(msg)
+	m.form = model.(*huh.Form)
+	return m, cmd
+}
+
+func (m dateRangeModel) view() string {
+	if m.width == 0 || m.height == 0 {
+		return ""
+	}
+	content := lipgloss.JoinVertical(lipgloss.Center,
+		renderGradientLogo(), "",
+		styleSplashTitle.Render("Change date range"),
+		"",
+		m.form.View(), "",
+		styleSplashHint.Render("esc to cancel · ctrl+c to quit"),
+	)
 	return lipgloss.Place(m.width, m.height, lipgloss.Center, lipgloss.Center, content)
 }
 
