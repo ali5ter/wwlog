@@ -161,8 +161,14 @@ func (m logModel) update(msg tea.Msg) (logModel, tea.Cmd) {
 	}
 
 	if !selChanged {
-		m.detail, cmd = m.detail.Update(msg)
-		cmds = append(cmds, cmd)
+		// Only forward non-key messages to the viewport. Key messages are
+		// handled above (ScrollUp/ScrollDown) or consumed by the list.
+		// Forwarding keys here causes the viewport to scroll when the list
+		// is at its first or last item and the navigation key has no effect.
+		if _, isKey := msg.(tea.KeyMsg); !isKey {
+			m.detail, cmd = m.detail.Update(msg)
+			cmds = append(cmds, cmd)
+		}
 	}
 
 	return m, tea.Batch(cmds...)

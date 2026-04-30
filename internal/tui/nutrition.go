@@ -93,7 +93,10 @@ func (m nutriModel) update(msg tea.Msg) (nutriModel, tea.Cmd) {
 	}
 	var cmd2 tea.Cmd
 	if !selChanged {
-		m.detail, cmd2 = m.detail.Update(msg)
+		// Only forward non-key messages to the viewport — same reasoning as logModel.
+		if _, isKey := msg.(tea.KeyMsg); !isKey {
+			m.detail, cmd2 = m.detail.Update(msg)
+		}
 	}
 	return m, tea.Batch(cmd, cmd2)
 }
