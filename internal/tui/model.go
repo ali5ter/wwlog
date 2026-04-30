@@ -212,6 +212,8 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			if m.exportModel.form.State == huh.StateCompleted {
 				format := m.exportModel.form.GetString("format")
 				dir := m.exportModel.form.GetString("dir")
+				m.screen = screenLog
+				m.statusMsg = styleFoodPortion.Render("  Saving…")
 				return m, runExport(format, dir, m.start, m.end, m.logs)
 			}
 			if m.exportModel.form.State == huh.StateAborted {
@@ -290,11 +292,38 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	if m.screen == screenExport {
 		var cmd tea.Cmd
 		m.exportModel, cmd = m.exportModel.update(msg)
+		// huh may complete via an internal message rather than a KeyMsg.
+		if m.exportModel.form.State == huh.StateCompleted {
+			format := m.exportModel.form.GetString("format")
+			dir := m.exportModel.form.GetString("dir")
+			m.screen = screenLog
+			m.statusMsg = styleFoodPortion.Render("  Saving…")
+			return m, runExport(format, dir, m.start, m.end, m.logs)
+		}
 		return m, cmd
 	}
 	if m.screen == screenDateRange {
 		var cmd tea.Cmd
 		m.dateRangeModel, cmd = m.dateRangeModel.update(msg)
+		// huh may complete via an internal message rather than a KeyMsg.
+		if m.dateRangeModel.form.State == huh.StateCompleted {
+			m.start = m.dateRangeModel.form.GetString("start")
+			m.end = m.dateRangeModel.form.GetString("end")
+			m.screen = screenLog
+			m.loading = true
+			authObj := m.authObj
+			tld := m.tld
+			start, end := m.start, m.end
+			return m, func() tea.Msg {
+				token, err := authObj.Token()
+				if err != nil {
+					return dataMsg{err: err}
+				}
+				client := api.New(token, tld)
+				logs, err := fetchLogs(client, start, end)
+				return dataMsg{logs: logs, client: client, err: err}
+			}
+		}
 		return m, cmd
 	}
 
@@ -343,10 +372,16 @@ func (m Model) View() string {
 
 func (m Model) loadingView() string {
 	spinStr := styleSplashSub.Render(fmt.Sprintf("%s  Loading your food log…", m.spinner.View()))
+	// Use the same body-height reservation as the splash view so the logo
+	// sits at the same vertical position during loading as it did on the splash screen.
+	body := lipgloss.JoinVertical(lipgloss.Center, spinStr, "", styleSplashHint.Render("q to quit"))
+	paddedBody := lipgloss.Place(m.width, splashBodyH, lipgloss.Center, lipgloss.Top, body)
 	content := lipgloss.JoinVertical(lipgloss.Center,
 		renderGradientLogo(), "",
-		spinStr, "",
-		styleSplashHint.Render("q to quit"),
+		styleSplashTitle.Render("wwlog  "+m.version),
+		styleSplashSub.Render("Weight Watchers food log browser"),
+		"",
+		paddedBody,
 	)
 	return lipgloss.Place(m.width, m.height, lipgloss.Center, lipgloss.Center, content)
 }
@@ -379,7 +414,7 @@ func (m Model) statusView() string {
 	}
 	hints := []string{
 		styleStatusKey.Render("↑/↓") + " navigate",
-		styleStatusKey.Render("⇧↑/⇧↓") + " scroll",
+		styleStatusKey.Render("⇧↑/↓") + " scroll",
 		styleStatusKey.Render("/") + " filter",
 		styleStatusKey.Render("r") + " range",
 		styleStatusKey.Render("s") + " sort",

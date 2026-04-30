@@ -214,21 +214,11 @@ func renderGradientLogo() string {
 	return strings.Join(rendered, "\n")
 }
 
+// splashBodyH is the reserved height for the body area (form or spinner).
+// Keeping this constant ensures the logo never shifts position between phases.
+const splashBodyH = 16
+
 func (m splashModel) view() string {
-	if m.width == 0 || m.height == 0 {
-		return ""
-	}
-
-	// Fixed header: logo + title + subtitle. Height never changes between phases,
-	// so the logo stays anchored at the same vertical position regardless of
-	// how tall the form body below it is.
-	header := lipgloss.JoinVertical(lipgloss.Center,
-		renderGradientLogo(), "",
-		styleSplashTitle.Render("wwlog  "+m.version),
-		styleSplashSub.Render("Weight Watchers food log browser"),
-		"",
-	)
-
 	var body string
 	switch m.phase {
 	case splashChecking:
@@ -242,20 +232,19 @@ func (m splashModel) view() string {
 		body = lipgloss.JoinVertical(lipgloss.Center, styleError.Render("  "+m.err), "", body)
 	}
 
-	hint := styleSplashHint.Render("ctrl+c to quit")
+	// Pad body to a fixed height so the logo's vertical position is identical
+	// across all phases (spinner → form transitions don't shift the logo).
+	paddedBody := lipgloss.Place(m.width, splashBodyH, lipgloss.Center, lipgloss.Top, body)
 
-	headerH := lipgloss.Height(header)
-	hintH := lipgloss.Height(hint) + 1
-	bodyH := m.height - headerH - hintH
-	if bodyH < 1 {
-		bodyH = 1
-	}
-
-	topBlock := lipgloss.Place(m.width, headerH, lipgloss.Center, lipgloss.Bottom, header)
-	bodyBlock := lipgloss.Place(m.width, bodyH, lipgloss.Center, lipgloss.Center, body)
-	botBlock := lipgloss.Place(m.width, hintH, lipgloss.Center, lipgloss.Bottom, hint)
-
-	return lipgloss.JoinVertical(lipgloss.Left, topBlock, bodyBlock, botBlock)
+	content := lipgloss.JoinVertical(lipgloss.Center,
+		renderGradientLogo(), "",
+		styleSplashTitle.Render("wwlog  "+m.version),
+		styleSplashSub.Render("Weight Watchers food log browser"),
+		"",
+		paddedBody,
+		styleSplashHint.Render("ctrl+c to quit"),
+	)
+	return lipgloss.Place(m.width, m.height, lipgloss.Center, lipgloss.Center, content)
 }
 
 // dateRangeModel is the in-TUI date range picker — same form as the splash
