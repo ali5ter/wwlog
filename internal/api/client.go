@@ -1,6 +1,7 @@
 package api
 
 import (
+	"bytes"
 	"encoding/json"
 	"fmt"
 	"net/http"
@@ -103,6 +104,25 @@ func DateRange(start, end string) ([]string, error) {
 		dates = append(dates, d.Format(layout))
 	}
 	return dates, nil
+}
+
+// FetchDayRaw returns the raw JSON response body for a single date. Used for
+// API inspection — run with --raw to see all available fields.
+func (c *Client) FetchDayRaw(date string) ([]byte, error) {
+	url := fmt.Sprintf(
+		"https://cmx.weightwatchers.%s/api/v3/cmx/operations/composed/members/~/my-day/%s",
+		c.tld, date,
+	)
+	resp, err := c.get(url)
+	if err != nil {
+		return nil, fmt.Errorf("fetch raw day %s: %w", date, err)
+	}
+	defer resp.Body.Close()
+	var buf bytes.Buffer
+	if _, err := buf.ReadFrom(resp.Body); err != nil {
+		return nil, err
+	}
+	return buf.Bytes(), nil
 }
 
 func (c *Client) get(url string) (*http.Response, error) {

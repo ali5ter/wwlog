@@ -275,7 +275,11 @@ func makeBar(value, max float64, width int) string {
 		filled = width
 	}
 	empty := width - filled
-	return lipgloss.NewStyle().Foreground(colorTeal).Render(strings.Repeat("█", filled)) +
+	barColor := colorTeal
+	if max > 0 && value > max {
+		barColor = colorPurple
+	}
+	return lipgloss.NewStyle().Foreground(barColor).Render(strings.Repeat("█", filled)) +
 		lipgloss.NewStyle().Foreground(colorSteel).Render(strings.Repeat("░", empty))
 }
 
