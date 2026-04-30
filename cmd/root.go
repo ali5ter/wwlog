@@ -24,6 +24,7 @@ var (
 	flagLogin  bool
 	flagLogout bool
 	flagTLD    string
+	flagRaw    bool
 	version    = "0.1.0"
 )
 
@@ -50,6 +51,8 @@ func init() {
 	rootCmd.Flags().BoolVar(&flagLogin, "login", false, "Authenticate and store credentials")
 	rootCmd.Flags().BoolVar(&flagLogout, "logout", false, "Clear stored credentials")
 	rootCmd.Flags().StringVarP(&flagTLD, "tld", "l", "com", "WW top-level domain (com, co.uk, etc.)")
+	rootCmd.Flags().BoolVar(&flagRaw, "raw", false, "Dump raw API JSON for the start date (for API inspection)")
+	_ = rootCmd.Flags().MarkHidden("raw")
 }
 
 func run(cmd *cobra.Command, _ []string) error {
@@ -91,6 +94,24 @@ func run(cmd *cobra.Command, _ []string) error {
 			msg += fmt.Sprintf(" Session expires %s.", exp.Local().Format("Mon 2 Jan 2006 at 15:04"))
 		}
 		fmt.Fprintln(os.Stderr, msg)
+		return nil
+	}
+
+	// Raw API dump for inspection (hidden flag, not shown in --help).
+	if flagRaw {
+		start := flagStart
+		if start == "" {
+			start = time.Now().Format("2006-01-02")
+		}
+		token, err := authenticator.Token()
+		if err != nil {
+			return fmt.Errorf("%w\nRun 'wwlog --login' to authenticate", err)
+		}
+		raw, err := api.New(token, tld).FetchDayRaw(start)
+		if err != nil {
+			return err
+		}
+		os.Stdout.Write(raw)
 		return nil
 	}
 
