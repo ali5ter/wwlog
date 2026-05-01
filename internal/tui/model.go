@@ -427,7 +427,7 @@ func (m Model) statusView() string {
 		styleStatusKey.Render("↑/↓") + " navigate",
 		styleStatusKey.Render("⇧↑/↓") + " scroll",
 	}
-	if m.activeTab == tabLog {
+	if m.activeTab == tabLog || m.activeTab == tabNutrition {
 		hints = append(hints, styleStatusKey.Render("/")+" filter")
 	}
 	hints = append(hints,

@@ -61,13 +61,18 @@ func (e FoodEntry) Nutrition() NutritionData {
 	if p.Size > 0 && e.PortionSize > 0 {
 		scale = e.PortionSize / p.Size
 	}
+	cal := p.Nutrition["calories"]
+	if cal == 0 {
+		// Some WW API entries omit "calories"; derive from macros (Atwater factors).
+		cal = 4*p.Nutrition["protein"] + 4*p.Nutrition["carbs"] + 9*p.Nutrition["fat"] + 7*p.Nutrition["alcohol"]
+	}
 	return NutritionData{
 		Name:         e.Name,
 		PortionName:  e.PortionName,
 		PortionSize:  e.PortionSize,
 		TrackedDate:  e.TrackedDate,
 		TimeOfDay:    e.TimeOfDay,
-		Calories:     p.Nutrition["calories"] * scale,
+		Calories:     cal * scale,
 		Fat:          p.Nutrition["fat"] * scale,
 		SaturatedFat: p.Nutrition["saturatedFat"] * scale,
 		Sodium:       p.Nutrition["sodium"] * scale,
