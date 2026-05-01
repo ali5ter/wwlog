@@ -130,8 +130,6 @@ tools against the WW API.
 ## Credits
 
 `wwlog` was inspired by [wwtracked](https://github.com/joswr1ght/wwtracked) by
-[Joshua Wright](https://github.com/joswr1ght). Joshua's work reverse-engineering the Weight
-Watchers API — and his willingness to share it — made this project possible. The authentication
-flow and API discovery documented in `wwtracked` provided the foundation that `wwlog` builds on,
-and the clarity and practicality of that original work set the bar for what a WW tool from the
-terminal should feel like.
+[Joshua Wright](https://github.com/joswr1ght). Without Joshua's work I would not have learnt
+about the Weight Watchers API and how to unlock all our data that we painstakingly enter into
+the mobile app. Thank you Joshua for sharing.
