@@ -272,7 +272,9 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			return m, tea.Quit
 		}
 		m.statusMsg = "" // any keypress clears the status message
-		if !m.loading && m.err == nil {
+		tabFiltering := (m.activeTab == tabLog && m.logModel.filtering) ||
+			(m.activeTab == tabNutrition && m.nutriModel.filtering)
+		if !m.loading && m.err == nil && !tabFiltering {
 			switch {
 			case key.Matches(msg, keys.Export):
 				m.exportModel = newExportModel(m.width, m.height)
@@ -427,7 +429,7 @@ func (m Model) statusView() string {
 		styleStatusKey.Render("↑/↓") + " navigate",
 		styleStatusKey.Render("⇧↑/↓") + " scroll",
 	}
-	if m.activeTab == tabLog {
+	if m.activeTab == tabLog || m.activeTab == tabNutrition {
 		hints = append(hints, styleStatusKey.Render("/")+" filter")
 	}
 	hints = append(hints,

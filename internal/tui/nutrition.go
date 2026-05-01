@@ -3,11 +3,13 @@ package tui
 import (
 	"fmt"
 	"math"
+	"sort"
 	"strings"
 
 	"github.com/ali5ter/wwlog/internal/api"
 	"github.com/charmbracelet/bubbles/key"
 	"github.com/charmbracelet/bubbles/list"
+	"github.com/charmbracelet/bubbles/textinput"
 	"github.com/charmbracelet/bubbles/viewport"
 	tea "github.com/charmbracelet/bubbletea"
 	"github.com/charmbracelet/lipgloss"
@@ -29,9 +31,13 @@ var rdv = &api.DayNutrition{
 
 type nutriModel struct {
 	list        list.Model
+	filter      textinput.Model
+	filtering   bool
 	detail      viewport.Model
-	logs        []*api.DayLog
-	data        map[string]*api.DayNutrition
+	allLogs     []*api.DayLog
+	logs        []*api.DayLog // filtered view
+	allData     map[string]*api.DayNutrition
+	data        map[string]*api.DayNutrition // filtered view
 	avgs        *api.DayNutrition
 	width       int
 	height      int
@@ -51,12 +57,21 @@ func newNutriModel(logs []*api.DayLog, data map[string]*api.DayNutrition, width,
 
 	l := newDateList(items, listWidth, listHeight)
 
+	fi := textinput.New()
+	fi.Placeholder = "filter by date (e.g. Jan, 04)"
+	fi.PromptStyle = styleFilterPrompt
+	fi.TextStyle = styleFilterText
+	fi.Prompt = "> "
+
 	vp := viewport.New(width-listWidth, height)
 
 	m := nutriModel{
 		list:        l,
+		filter:      fi,
 		detail:      vp,
+		allLogs:     logs,
 		logs:        logs,
+		allData:     data,
 		data:        data,
 		avgs:        computeAverages(data, logs),
 		width:       width,
@@ -69,19 +84,47 @@ func newNutriModel(logs []*api.DayLog, data map[string]*api.DayNutrition, width,
 }
 
 func (m nutriModel) update(msg tea.Msg) (nutriModel, tea.Cmd) {
+	var cmds []tea.Cmd
+	var cmd tea.Cmd
+
 	if msg, ok := msg.(tea.KeyMsg); ok {
-		switch {
-		case key.Matches(msg, keys.ScrollUp):
-			m.detail.LineUp(3)
-			return m, nil
-		case key.Matches(msg, keys.ScrollDown):
-			m.detail.LineDown(3)
-			return m, nil
+		if m.filtering {
+			switch msg.String() {
+			case "enter", "esc":
+				m.filtering = false
+				m.filter.Blur()
+				m.applyFilter()
+				return m, nil
+			case "up", "k", "down", "j":
+				m.filtering = false
+				m.filter.Blur()
+				m.applyFilter()
+				// fall through to list navigation below
+			default:
+				m.filter, cmd = m.filter.Update(msg)
+				cmds = append(cmds, cmd)
+				m.applyFilter()
+				return m, tea.Batch(cmds...)
+			}
+		} else {
+			switch {
+			case key.Matches(msg, keys.Filter):
+				m.filtering = true
+				m.filter.Focus()
+				return m, textinput.Blink
+			case key.Matches(msg, keys.ScrollUp):
+				m.detail.LineUp(3)
+				return m, nil
+			case key.Matches(msg, keys.ScrollDown):
+				m.detail.LineDown(3)
+				return m, nil
+			}
 		}
 	}
 
-	var cmd tea.Cmd
 	m.list, cmd = m.list.Update(msg)
+	cmds = append(cmds, cmd)
+
 	selChanged := false
 	if i := m.list.Index(); i != m.selected && i < len(m.logs) {
 		m.selected = i
@@ -89,28 +132,69 @@ func (m nutriModel) update(msg tea.Msg) (nutriModel, tea.Cmd) {
 		m.detail.GotoTop()
 		selChanged = true
 	}
-	var cmd2 tea.Cmd
+
 	if !selChanged {
 		// Only forward non-key messages to the viewport — same reasoning as logModel.
 		if _, isKey := msg.(tea.KeyMsg); !isKey {
-			m.detail, cmd2 = m.detail.Update(msg)
+			m.detail, cmd = m.detail.Update(msg)
+			cmds = append(cmds, cmd)
 		}
 	}
-	return m, tea.Batch(cmd, cmd2)
+	return m, tea.Batch(cmds...)
 }
 
 func (m nutriModel) view() string {
 	listWidth := m.width / 3
 	detailWidth := m.width - listWidth
 
-	label := styleDim.Render("> dates")
-	sep := styleDim.Render(strings.Repeat("─", listWidth-1))
+	var filterBar string
+	if m.filtering {
+		filterBar = m.filter.View()
+	} else if m.filter.Value() != "" {
+		filterBar = styleFilterPrompt.Render("> ") + styleFilterText.Render(m.filter.Value())
+	} else {
+		filterBar = styleDim.Render("> filter by date…")
+	}
+	filterSep := styleDim.Render(strings.Repeat("─", listWidth-1))
 
 	listPane := stylePanelBorder.Width(listWidth).Render(
-		lipgloss.JoinVertical(lipgloss.Left, label, sep, m.list.View()),
+		lipgloss.JoinVertical(lipgloss.Left, filterBar, filterSep, m.list.View()),
 	)
 	detailPane := lipgloss.NewStyle().Width(detailWidth).Padding(0, 1).Render(m.detail.View())
 	return lipgloss.JoinHorizontal(lipgloss.Top, listPane, detailPane)
+}
+
+func (m *nutriModel) applyFilter() {
+	q := strings.ToLower(m.filter.Value())
+	var filtered []*api.DayLog
+	for _, l := range m.allLogs {
+		if q == "" ||
+			strings.Contains(strings.ToLower(l.Date), q) ||
+			strings.Contains(strings.ToLower(m.locale.dateShort(l.Date)), q) {
+			filtered = append(filtered, l)
+		}
+	}
+	m.logs = filtered
+	filteredData := make(map[string]*api.DayNutrition, len(filtered))
+	for _, l := range filtered {
+		if dn, ok := m.allData[l.Date]; ok {
+			filteredData[l.Date] = dn
+		}
+	}
+	m.data = filteredData
+	m.avgs = computeAverages(filteredData, filtered)
+	items := make([]list.Item, len(filtered))
+	for i, l := range filtered {
+		items[i] = dateItem{log: l, locale: m.locale}
+	}
+	m.list.SetItems(items)
+	m.selected = 0
+	if len(filtered) > 0 {
+		m.detail.SetContent(m.renderDetail())
+	} else {
+		m.detail.SetContent(styleFoodPortion.Render("No matching dates."))
+	}
+	m.detail.GotoTop()
 }
 
 func (m *nutriModel) resize(width, height int) {
@@ -120,7 +204,7 @@ func (m *nutriModel) resize(width, height int) {
 	m.width = width
 	m.height = height
 	listWidth := width / 3
-	m.list.SetSize(listWidth, height-2)
+	m.list.SetSize(listWidth, height-2) // -2 for filter bar + separator
 	detailWidth := width - listWidth
 	m.detail.Width = detailWidth
 	m.detail.Height = height
@@ -245,6 +329,7 @@ func writeTrendTable(b *strings.Builder, logs []*api.DayLog, data map[string]*ap
 				vals[i] = m.get(dn)
 			}
 		}
+		vals = clampOutliers(vals)
 		chart := asciigraph.Plot(vals,
 			asciigraph.Height(4),
 			asciigraph.Width(plotW),
@@ -259,6 +344,35 @@ func writeTrendTable(b *strings.Builder, logs []*api.DayLog, data map[string]*ap
 		)
 		fmt.Fprintf(b, "%s\n\n", chart)
 	}
+}
+
+// clampOutliers replaces statistical outliers (Tukey: Q3 + 3×IQR) with the
+// upper fence value so a single bad WW API data point doesn't collapse the
+// chart scale and make every other day look like zero.
+func clampOutliers(vals []float64) []float64 {
+	if len(vals) < 4 {
+		return vals
+	}
+	sorted := make([]float64, len(vals))
+	copy(sorted, vals)
+	sort.Float64s(sorted)
+	n := len(sorted)
+	q1 := sorted[n/4]
+	q3 := sorted[n*3/4]
+	iqr := q3 - q1
+	if iqr <= 0 {
+		return vals
+	}
+	fence := q3 + 3*iqr
+	result := make([]float64, len(vals))
+	for i, v := range vals {
+		if v > fence {
+			result[i] = fence
+		} else {
+			result[i] = v
+		}
+	}
+	return result
 }
 
 func makeBar(value, max float64, width int) string {
@@ -295,35 +409,45 @@ func formatNutriValue(v float64) string {
 }
 
 func computeAverages(data map[string]*api.DayNutrition, logs []*api.DayLog) *api.DayNutrition {
-	avg := &api.DayNutrition{}
-	n := 0
+	type fields struct {
+		cals, fat, satFat, sodium, carbs, fiber, sugar, protein, alcohol []float64
+	}
+	var f fields
 	for _, day := range logs {
 		dn, ok := data[day.Date]
 		if !ok {
 			continue
 		}
-		avg.Calories += dn.Calories
-		avg.Fat += dn.Fat
-		avg.SaturatedFat += dn.SaturatedFat
-		avg.Sodium += dn.Sodium
-		avg.Carbs += dn.Carbs
-		avg.Fiber += dn.Fiber
-		avg.Sugar += dn.Sugar
-		avg.Protein += dn.Protein
-		avg.Alcohol += dn.Alcohol
-		n++
+		f.cals = append(f.cals, dn.Calories)
+		f.fat = append(f.fat, dn.Fat)
+		f.satFat = append(f.satFat, dn.SaturatedFat)
+		f.sodium = append(f.sodium, dn.Sodium)
+		f.carbs = append(f.carbs, dn.Carbs)
+		f.fiber = append(f.fiber, dn.Fiber)
+		f.sugar = append(f.sugar, dn.Sugar)
+		f.protein = append(f.protein, dn.Protein)
+		f.alcohol = append(f.alcohol, dn.Alcohol)
 	}
-	if n > 0 {
-		f := float64(n)
-		avg.Calories /= f
-		avg.Fat /= f
-		avg.SaturatedFat /= f
-		avg.Sodium /= f
-		avg.Carbs /= f
-		avg.Fiber /= f
-		avg.Sugar /= f
-		avg.Protein /= f
-		avg.Alcohol /= f
+	meanOf := func(vals []float64) float64 {
+		clamped := clampOutliers(vals)
+		var sum float64
+		for _, v := range clamped {
+			sum += v
+		}
+		if len(clamped) == 0 {
+			return 0
+		}
+		return sum / float64(len(clamped))
 	}
-	return avg
+	return &api.DayNutrition{
+		Calories:     meanOf(f.cals),
+		Fat:          meanOf(f.fat),
+		SaturatedFat: meanOf(f.satFat),
+		Sodium:       meanOf(f.sodium),
+		Carbs:        meanOf(f.carbs),
+		Fiber:        meanOf(f.fiber),
+		Sugar:        meanOf(f.sugar),
+		Protein:      meanOf(f.protein),
+		Alcohol:      meanOf(f.alcohol),
+	}
 }

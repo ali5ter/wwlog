@@ -296,11 +296,15 @@ func (m dateRangeModel) view() string {
 	if m.width == 0 || m.height == 0 {
 		return ""
 	}
+	// Use the same fixed-height body region as the splash screen so the logo
+	// never shifts position as the form transitions between fields.
+	paddedBody := lipgloss.Place(m.width, splashBodyH, lipgloss.Center, lipgloss.Top, m.form.View())
 	content := lipgloss.JoinVertical(lipgloss.Center,
 		renderGradientLogo(), "",
 		styleSplashTitle.Render("Change date range"),
+		styleSplashSub.Render("Weight Watchers food log browser"),
 		"",
-		m.form.View(), "",
+		paddedBody,
 		styleSplashHint.Render("esc to cancel · ctrl+c to quit"),
 	)
 	return lipgloss.Place(m.width, m.height, lipgloss.Center, lipgloss.Center, content)
