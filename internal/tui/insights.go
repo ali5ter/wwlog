@@ -3,6 +3,7 @@ package tui
 import (
 	"fmt"
 	"strings"
+	"time"
 
 	"github.com/ali5ter/wwlog/internal/api"
 	"github.com/charmbracelet/bubbles/key"
@@ -98,6 +99,10 @@ func (m *insightsModel) render() string {
 	}
 
 	var b strings.Builder
+
+	// ── Points Heatmap ─────────────────────────────────────────────
+	fmt.Fprintf(&b, "%s\n%s\n\n", styleMealHeading.Render("Points Budget  (day by day)"), sep)
+	fmt.Fprintf(&b, "%s\n\n", renderHeatmap(m.logs, vw))
 
 	// ── Range Summary ──────────────────────────────────────────────
 	fmt.Fprintf(&b, "%s\n%s\n\n", styleMealHeading.Render("Range Summary"), sep)
@@ -206,6 +211,137 @@ func writeMacroBar(b *strings.Builder, label string, pct, grams float64, unit st
 	pctCol := lipgloss.NewStyle().Width(6).Render(styleDetailValue.Render(fmt.Sprintf("%.0f%%", pct)))
 	gramCol := styleFoodPortion.Render(fmt.Sprintf("%.0f%s avg", grams, unit))
 	fmt.Fprintf(b, "  %s%s  %s  %s\n", labelCol, pctCol, bar, gramCol)
+}
+
+// renderHeatmap draws a GitHub-style calendar grid coloured by daily points
+// vs target. Weeks run left→right, days Mon→Sun top→bottom.
+func renderHeatmap(logs []*api.DayLog, vw int) string {
+	const layout = "2006-01-02"
+
+	// Build per-date lookup: ratio of points used vs target.
+	type entry struct {
+		ratio     float64
+		hasTarget bool
+	}
+	days := make(map[string]entry, len(logs))
+	for _, log := range logs {
+		if log.Points.DailyTarget > 0 {
+			days[log.Date] = entry{
+				ratio:     log.Points.DailyUsed / log.Points.DailyTarget,
+				hasTarget: true,
+			}
+		} else {
+			days[log.Date] = entry{hasTarget: false}
+		}
+	}
+
+	first, _ := time.Parse(layout, logs[0].Date)
+	last, _ := time.Parse(layout, logs[len(logs)-1].Date)
+
+	// Monday of the first week.
+	monOff := (int(first.Weekday()) + 6) % 7
+	gridStart := first.AddDate(0, 0, -monOff)
+
+	// Collect week start Mondays that overlap the range.
+	var weeks []time.Time
+	for d := gridStart; !d.After(last); d = d.AddDate(0, 0, 7) {
+		weeks = append(weeks, d)
+	}
+	nWeeks := len(weeks)
+	if nWeeks == 0 {
+		return ""
+	}
+
+	// Compute cell width so the grid fills vw naturally.
+	// Layout: "Mo  " (4) + nWeeks×cellW + (nWeeks-1)×gap
+	const gap = 2
+	const dayLabelW = 4
+	cellW := (vw - dayLabelW - gap*(nWeeks-1)) / nWeeks
+	if cellW < 2 {
+		cellW = 2
+	}
+	if cellW > 10 {
+		cellW = 10
+	}
+
+	// Cell colour: dark teal (nothing) → colorTeal (on budget) → colorPurple (over).
+	darkTeal := lipgloss.Color("#003d30")
+	cellStyle := func(dateStr string) string {
+		blocks := strings.Repeat("█", cellW)
+		e, inRange := days[dateStr]
+		if !inRange {
+			return strings.Repeat(" ", cellW) // outside the date range: blank
+		}
+		if !e.hasTarget {
+			return lipgloss.NewStyle().Foreground(colorLine).Render(blocks)
+		}
+		var color lipgloss.Color
+		switch {
+		case e.ratio > 1.02:
+			color = colorPurple
+		case e.ratio >= 0.85:
+			color = colorTeal
+		default:
+			t := e.ratio / 0.85
+			if t < 0 {
+				t = 0
+			}
+			color = lerpColor(darkTeal, colorTeal, t)
+		}
+		return lipgloss.NewStyle().Foreground(color).Render(blocks)
+	}
+
+	var b strings.Builder
+
+	// Header row: week start date, styled to align with each column.
+	fmt.Fprintf(&b, "%s", strings.Repeat(" ", dayLabelW))
+	for i, w := range weeks {
+		if i > 0 {
+			fmt.Fprintf(&b, "%s", strings.Repeat(" ", gap))
+		}
+		var label string
+		switch {
+		case cellW >= 6:
+			label = w.Format("Jan 2")
+		case cellW >= 4:
+			label = w.Format("1/2")
+		default:
+			// Show month initial only when the month changes.
+			if i == 0 || w.Month() != weeks[i-1].Month() {
+				label = w.Format("Jan")[:1]
+			} else {
+				label = " "
+			}
+		}
+		fmt.Fprintf(&b, "%s", styleFoodPortion.Render(fmt.Sprintf("%-*s", cellW, label)))
+	}
+	fmt.Fprintln(&b)
+
+	// Day rows Mon→Sun.
+	dayNames := [7]string{"Mo", "Tu", "We", "Th", "Fr", "Sa", "Su"}
+	for row, name := range dayNames {
+		fmt.Fprintf(&b, "%s  ", styleDetailLabel.Render(name))
+		for i, weekMon := range weeks {
+			if i > 0 {
+				fmt.Fprintf(&b, "%s", strings.Repeat(" ", gap))
+			}
+			date := weekMon.AddDate(0, 0, row)
+			fmt.Fprintf(&b, "%s", cellStyle(date.Format(layout)))
+		}
+		fmt.Fprintln(&b)
+	}
+
+	// Legend.
+	fmt.Fprintln(&b)
+	none := lipgloss.NewStyle().Foreground(colorLine).Render("██")
+	low := lipgloss.NewStyle().Foreground(lerpColor(darkTeal, colorTeal, 0.3)).Render("██")
+	mid := lipgloss.NewStyle().Foreground(lerpColor(darkTeal, colorTeal, 0.6)).Render("██")
+	full := lipgloss.NewStyle().Foreground(colorTeal).Render("██")
+	over := lipgloss.NewStyle().Foreground(colorPurple).Render("██")
+	fmt.Fprintf(&b, "  %s no log  %s %s %s on budget  %s over budget",
+		none, low, mid, full, over)
+
+	return b.String()
 }
 
 // zeroPointFoods returns foods with 0 total points, sorted by frequency.
