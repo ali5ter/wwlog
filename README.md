@@ -2,9 +2,21 @@
 
 Browse and export your Weight Watchers food log from the terminal.
 
-`wwlog` is a TUI application built to let you interactively explore your tracked food log by date, view nutritional summaries, and *export data reports* — without touching the WW app.
+`wwlog` is a three-tab TUI that lets you interactively explore your tracked food log by date,
+view nutritional summaries, inspect trends and insights — all without touching the WW app.
 
 ![wwlog demo](examples/wwlog_demo.gif)
+
+## Features
+
+- **Log tab** — day-by-day food log with points bar, meal breakdown, and per-entry kcal;
+  filter by date and sort entries by points or calories
+- **Nutrition tab** — nutrient bars vs recommended daily values, per-day averages,
+  and asciigraph trend charts (calories, protein, carbs, fat) across the selected range
+- **Insights tab** — calendar heatmap of daily points budget, range summary,
+  points by meal, macro distribution, top foods by points, and zero-point food log
+- **Pipeline mode** — `--json`, `--report`, and `--export` flags for scripting and file output
+- **No DevTools required** — one `--login` step stores credentials in your system keychain
 
 ## Installation
 
@@ -51,14 +63,21 @@ wwlog --login
 ## Usage
 
 ```bash
-# Open the TUI for today
+# Open the TUI (defaults to the last 7 days)
 wwlog
 
 # Browse a specific date range
 wwlog --start 2026-04-20 --end 2026-04-26
 
-# Export last week's log to JSON (pipeline mode)
+# Print insights report to stdout (no TUI)
+wwlog --start 2026-04-20 --end 2026-04-26 --report
+
+# Output log as JSON to stdout
 wwlog --start 2026-04-20 --end 2026-04-26 --json
+
+# Export to a file (json | csv | markdown | report)
+wwlog --start 2026-04-20 --end 2026-04-26 --export markdown
+wwlog --start 2026-04-20 --end 2026-04-26 --export json --output ~/Downloads/
 
 # Clear stored credentials
 wwlog --logout
@@ -69,23 +88,36 @@ wwlog --logout
 | Key | Action |
 |-----|--------|
 | `↑` / `↓` or `k` / `j` | Navigate dates |
-| `/` | Filter dates |
+| `⇧↑` / `⇧↓` | Scroll detail pane |
+| `/` | Filter dates (Log and Nutrition tabs) |
+| `s` | Cycle sort order (logged → by points → by kcal) |
+| `r` | Change date range |
+| `e` | Export (opens format picker) |
 | `tab` / `⇧tab` | Switch tabs |
-| `^E` | Export current view |
-| `q` | Quit |
+| `q` or `ctrl+c` | Quit |
 
 ## Options
 
 | Flag | Default | Description |
 |------|---------|-------------|
-| `-s`, `--start` | today | Start date (YYYY-MM-DD) |
+| `-s`, `--start` | 7 days ago | Start date (YYYY-MM-DD) |
 | `-e`, `--end` | today | End date (YYYY-MM-DD) |
-| `-n`, `--nutrition` | false | Include nutritional data |
-| `--json` | false | Output as JSON (no TUI) |
-| `--no-tty` | false | Force pipeline mode |
+| `--json` | — | Output log as JSON to stdout (no TUI) |
+| `-r`, `--report` | — | Output insights report as text to stdout (no TUI) |
+| `--export` | — | Export to file: `json`, `csv`, `markdown`, or `report` |
+| `-o`, `--output` | `reports/` | Output file or directory for `--export` |
+| `--no-tty` | — | Force pipeline mode even in a terminal |
 | `--login` | — | Authenticate and store credentials |
 | `--logout` | — | Clear stored credentials |
-| `-l`, `--tld` | `com` | WW domain (com, co.uk, etc.) |
+| `-l`, `--tld` | `com` | WW top-level domain (`com`, `co.uk`, etc.) |
+
+## Configuration
+
+Optional config at `~/.config/wwlog/config.toml`:
+
+```toml
+tld       = "com"   # WW top-level domain
+```
 
 ## WW API reference
 
@@ -94,16 +126,6 @@ endpoints used by `wwlog`, reverse-engineered from live traffic. It covers
 authentication, the member profile endpoint, and the `my-day` food log endpoint,
 including all known fields and their meanings. Useful for developers building
 tools against the WW API.
-
-## Configuration
-
-Optional config at `~/.config/wwlog/config.toml`:
-
-```toml
-tld       = "com"   # WW top-level domain
-theme     = "auto"  # colour theme
-cache_ttl = 3600    # cache TTL in seconds
-```
 
 ## Credits
 
