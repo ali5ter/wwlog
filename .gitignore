@@ -5,4 +5,7 @@ reports/
 *~
 .env
 *.cast
+WW_API_REFERENCE.md
 CLAUDE.md
+AGENTS.md
+AGENTS.md.backup.*
