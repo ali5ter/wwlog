@@ -83,13 +83,17 @@ var (
 				Bold(true)
 
 	styleTabActive = lipgloss.NewStyle().
+			Background(colorLine).
 			Foreground(colorTeal).
 			Bold(true).
-			Padding(0, 1)
+			Padding(0, 1).
+			MarginRight(1)
 
 	styleTabInactive = lipgloss.NewStyle().
 				Foreground(colorMuted).
-				Padding(0, 1)
+				Background(colorPanel).
+				Padding(0, 1).
+				MarginRight(1)
 
 	styleStatusBar = lipgloss.NewStyle().
 			Background(colorPanel).

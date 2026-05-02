@@ -7,18 +7,15 @@ import (
 
 	"github.com/ali5ter/wwlog/internal/auth"
 	"github.com/charmbracelet/bubbles/spinner"
-	"github.com/charmbracelet/huh"
 	tea "github.com/charmbracelet/bubbletea"
+	"github.com/charmbracelet/huh"
 	"github.com/charmbracelet/lipgloss"
 )
 
 const asciiLogo = `
- ██╗    ██╗██╗    ██╗
- ██║    ██║██║    ██║
- ██║ █╗ ██║██║ █╗ ██║
- ██║███╗██║██║███╗██║
- ╚███╔███╔╝╚███╔███╔╝
-  ╚══╝╚══╝  ╚══╝╚══╝`
+ ╦ ╦ ╦ ╦ ╦   ╔═╗ ╔═╗
+ ║║║ ║║║ ║   ║ ║ ║ ╦
+ ╚╩╝ ╚╩╝ ╩═╝ ╚═╝ ╚═╝`
 
 type splashPhase int
 
@@ -202,8 +199,8 @@ func (m splashModel) update(msg tea.Msg) (splashModel, tea.Cmd) {
 	return m, cmd
 }
 
-// renderGradientLogo renders the WW ASCII logo with a smooth RGB gradient
-// interpolated line-by-line from WW teal (#00B388) at the top to WW purple
+// renderGradientLogo renders the splash ASCII logo with a smooth RGB gradient
+// interpolated line-by-line from teal (#00B388) at the top to purple
 // (#6B4C9A) at the bottom.
 func renderGradientLogo() string {
 	lines := strings.Split(strings.TrimLeft(asciiLogo, "\n"), "\n")
@@ -244,8 +241,7 @@ func (m splashModel) view() string {
 
 	content := lipgloss.JoinVertical(lipgloss.Center,
 		renderGradientLogo(), "",
-		styleSplashTitle.Render("wwlog  "+m.version),
-		styleSplashSub.Render("Weight Watchers food log browser"),
+		styleSplashSub.Render("Browse and export your food log"),
 		"",
 		paddedBody,
 		styleSplashHint.Render("ctrl+c to quit"),
@@ -302,7 +298,7 @@ func (m dateRangeModel) view() string {
 	content := lipgloss.JoinVertical(lipgloss.Center,
 		renderGradientLogo(), "",
 		styleSplashTitle.Render("Change date range"),
-		styleSplashSub.Render("Weight Watchers food log browser"),
+		styleSplashSub.Render("Browse and export your food log"),
 		"",
 		paddedBody,
 		styleSplashHint.Render("esc to cancel · ctrl+c to quit"),
@@ -314,12 +310,12 @@ func (m dateRangeModel) view() string {
 func wwHuhTheme() *huh.Theme {
 	t := huh.ThemeCharm()
 
-	teal   := lipgloss.Color("#00B388")
+	teal := lipgloss.Color("#00B388")
 	purple := lipgloss.Color("#6B4C9A")
-	steel  := lipgloss.Color("#7f93a6")
-	muted  := lipgloss.Color("#a8b6c0")
-	panel  := lipgloss.Color("#161d24")
-	text   := lipgloss.Color("#e9eff3")
+	steel := lipgloss.Color("#7f93a6")
+	muted := lipgloss.Color("#a8b6c0")
+	panel := lipgloss.Color("#161d24")
+	text := lipgloss.Color("#e9eff3")
 
 	t.Focused.Base = t.Focused.Base.BorderForeground(teal)
 	t.Focused.Card = t.Focused.Base
@@ -354,4 +350,3 @@ func wwHuhTheme() *huh.Theme {
 
 	return t
 }
-

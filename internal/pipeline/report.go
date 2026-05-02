@@ -17,7 +17,7 @@ func EmitTextReport(w io.Writer, logs []*api.DayLog) error {
 
 	start := logs[0].Date
 	end := logs[len(logs)-1].Date
-	fmt.Fprintf(w, "Weight Watchers Food Log — %s → %s\n", start, end)
+	fmt.Fprintf(w, "Food Log — %s → %s\n", start, end)
 	fmt.Fprintln(w, strings.Repeat("─", 60))
 
 	// Range summary

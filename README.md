@@ -1,26 +1,27 @@
 # wwlog
 
-Browse and export your Weight Watchers food log from the terminal.
+`wwlog` unlocks the WeightWatchers data you enter in the mobile app.
 
-`wwlog` is a three-tab TUI that lets you interactively explore your tracked food log by date,
-view nutritional summaries, inspect trends and insights — all without touching the WW app.
+It provides a CLI for exporting text, Markdown, JSON, and CSV so you can analyze your data with your own tools across a selected date range.
+
+It also includes a TUI for browsing daily logs, comparing nutrition, and viewing insights across a selected date range.
 
 ![wwlog demo](examples/wwlog_demo.gif)
 
 ## Features
 
-- **Log tab** — day-by-day food log with points bar, meal breakdown, and per-entry kcal;
+- **Log tab** — day-by-day food log with a points bar, meal breakdown, and per-entry kcal;
   filter by date and sort entries by points or calories
-- **Nutrition tab** — nutrient bars vs recommended daily values, per-day averages,
-  and asciigraph trend charts (calories, protein, carbs, fat) across the selected range
-- **Insights tab** — calendar heatmap of daily points budget, range summary,
-  points by meal, macro distribution, top foods by points, and zero-point food log
+- **Nutrition tab** — nutrient bars vs. recommended daily values, per-day averages,
+  and asciigraph trend charts for calories, protein, carbs, and fat across the selected range
+- **Insights tab** — a calendar heatmap of daily points budget, range summary,
+  points by meal, macro distribution, top foods by points, and a zero-point food log
 - **Pipeline mode** — `--json`, `--report`, and `--export` flags for scripting and file output
 - **No DevTools required** — one `--login` step stores credentials in your system keychain
 
 ## Installation
 
-**Homebrew** (macOS and Linux):
+**Homebrew** (macOS):
 
 ```bash
 brew install ali5ter/tap/wwlog
@@ -75,7 +76,7 @@ wwlog --start 2026-04-20 --end 2026-04-26 --report
 # Output log as JSON to stdout
 wwlog --start 2026-04-20 --end 2026-04-26 --json
 
-# Export to a file (json | csv | markdown | report)
+# Export to a file (JSON | CSV | Markdown | report)
 wwlog --start 2026-04-20 --end 2026-04-26 --export markdown
 wwlog --start 2026-04-20 --end 2026-04-26 --export json --output ~/Downloads/
 
@@ -119,17 +120,7 @@ Optional config at `~/.config/wwlog/config.toml`:
 tld       = "com"   # WW top-level domain
 ```
 
-## WW API reference
-
-[`WW_API_REFERENCE.md`](WW_API_REFERENCE.md) documents the Weight Watchers API
-endpoints used by `wwlog`, reverse-engineered from live traffic. It covers
-authentication, the member profile endpoint, and the `my-day` food log endpoint,
-including all known fields and their meanings. Useful for developers building
-tools against the WW API.
-
 ## Credits
 
 `wwlog` was inspired by [wwtracked](https://github.com/joswr1ght/wwtracked) by
-[Joshua Wright](https://github.com/joswr1ght). Without Joshua's work I would not have learnt
-about the Weight Watchers API and how to unlock all our data that we painstakingly enter into
-the mobile app. Thank you Joshua for sharing.
+[Joshua Wright](https://github.com/joswr1ght).

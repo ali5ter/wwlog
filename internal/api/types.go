@@ -5,10 +5,10 @@ import "encoding/json"
 
 // DefaultPortion holds the canonical portion definition embedded in each tracked food entry.
 type DefaultPortion struct {
-	Name      string         `json:"name"`
-	Size      float64        `json:"size"`
-	Nutrition NutritionMap   `json:"nutrition"`
-	Points    float64        `json:"points"`
+	Name      string       `json:"name"`
+	Size      float64      `json:"size"`
+	Nutrition NutritionMap `json:"nutrition"`
+	Points    float64      `json:"points"`
 }
 
 // NutritionMap is a mixed-type map from the WW API — most values are floats but

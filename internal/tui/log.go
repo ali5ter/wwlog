@@ -18,9 +18,9 @@ import (
 type sortMode int
 
 const (
-	sortLogged  sortMode = iota // logged order (default)
-	sortByPts                   // highest WW points first
-	sortByKcal                  // highest calories first
+	sortLogged sortMode = iota // logged order (default)
+	sortByPts                  // highest WW points first
+	sortByKcal                 // highest calories first
 )
 
 func (s sortMode) label() string {

@@ -8,8 +8,8 @@ import (
 
 	"github.com/ali5ter/wwlog/internal/api"
 	"github.com/ali5ter/wwlog/internal/pipeline"
-	"github.com/charmbracelet/huh"
 	tea "github.com/charmbracelet/bubbletea"
+	"github.com/charmbracelet/huh"
 	"github.com/charmbracelet/lipgloss"
 )
 

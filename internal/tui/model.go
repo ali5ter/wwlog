@@ -65,23 +65,23 @@ type Model struct {
 	animNutrition spinner.Model
 	loading       bool
 	err           error
-	activeTab      tab
-	logs           []*api.DayLog
-	logModel       logModel
-	nutriModel     nutriModel
-	insightsModel  insightsModel
+	activeTab     tab
+	logs          []*api.DayLog
+	logModel      logModel
+	nutriModel    nutriModel
+	insightsModel insightsModel
 
-	splashModel     splashModel
-	exportModel     exportModel
-	dateRangeModel  dateRangeModel
-	authObj         *auth.Auth
-	tld           string
-	start         string
-	end           string
-	version       string
-	latestVersion string
-	client        *api.Client
-	statusMsg     string
+	splashModel    splashModel
+	exportModel    exportModel
+	dateRangeModel dateRangeModel
+	authObj        *auth.Auth
+	tld            string
+	start          string
+	end            string
+	version        string
+	latestVersion  string
+	client         *api.Client
+	statusMsg      string
 }
 
 // Run initialises and starts the TUI, blocking until the user quits.
@@ -390,8 +390,7 @@ func (m Model) loadingView() string {
 	paddedBody := lipgloss.Place(m.width, splashBodyH, lipgloss.Center, lipgloss.Top, spinStr)
 	content := lipgloss.JoinVertical(lipgloss.Center,
 		renderGradientLogo(), "",
-		styleSplashTitle.Render("wwlog  "+m.version),
-		styleSplashSub.Render("Weight Watchers food log browser"),
+		styleSplashSub.Render("Browse and export your food log"),
 		"",
 		paddedBody,
 		styleSplashHint.Render("q to quit"),
@@ -400,8 +399,7 @@ func (m Model) loadingView() string {
 }
 
 func (m Model) headerView() string {
-	logo := styleHeaderAccent.Render("W—W")
-	title := styleHeader.Render(" · wwlog")
+	title := styleHeaderAccent.Render("wwlog")
 
 	var tabParts strings.Builder
 	for i, name := range tabNames {
@@ -413,7 +411,7 @@ func (m Model) headerView() string {
 	}
 
 	dateRange := styleHeader.Render(m.start + " → " + m.end)
-	left := lipgloss.JoinHorizontal(lipgloss.Center, logo, title, "  ", tabParts.String())
+	left := lipgloss.JoinHorizontal(lipgloss.Center, title, styleHeader.Render(" · "), tabParts.String())
 	gap := max(0, m.width-lipgloss.Width(left)-lipgloss.Width(dateRange))
 	return lipgloss.NewStyle().
 		Background(colorPanel).

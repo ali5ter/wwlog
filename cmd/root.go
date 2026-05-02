@@ -34,7 +34,7 @@ var (
 
 var rootCmd = &cobra.Command{
 	Use:     "wwlog",
-	Short:   "Browse and export your Weight Watchers food log",
+	Short:   "Browse and export your food log",
 	Version: version,
 	RunE:    run,
 }
@@ -54,7 +54,7 @@ func init() {
 	rootCmd.Flags().BoolVar(&flagNoTTY, "no-tty", false, "Force pipeline mode even in a terminal")
 	rootCmd.Flags().BoolVar(&flagLogin, "login", false, "Authenticate and store credentials")
 	rootCmd.Flags().BoolVar(&flagLogout, "logout", false, "Clear stored credentials")
-	rootCmd.Flags().StringVarP(&flagTLD, "tld", "l", "com", "WW top-level domain (com, co.uk, etc.)")
+	rootCmd.Flags().StringVarP(&flagTLD, "tld", "l", "com", "Service top-level domain (com, co.uk, etc.)")
 	rootCmd.Flags().BoolVar(&flagRaw, "raw", false, "Dump raw API JSON for the start date (for API inspection)")
 	_ = rootCmd.Flags().MarkHidden("raw")
 	rootCmd.Flags().StringVar(&flagExport, "export", "", "Export format: json, csv, markdown, report")

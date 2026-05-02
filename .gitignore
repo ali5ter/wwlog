@@ -7,5 +7,6 @@ reports/
 *.cast
 WW_API_REFERENCE.md
 CLAUDE.md
+CLAUDE.md.backup.*
 AGENTS.md
 AGENTS.md.backup.*

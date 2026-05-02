@@ -56,7 +56,7 @@ func WriteLogCSV(w io.Writer, logs []*api.DayLog) error {
 
 // EmitMarkdown writes a Markdown food log report to w.
 func EmitMarkdown(w io.Writer, logs []*api.DayLog) error {
-	fmt.Fprintf(w, "# Weight Watchers Food Log\n\n")
+	fmt.Fprintf(w, "# Food Log\n\n")
 	for _, day := range logs {
 		fmt.Fprintf(w, "## %s\n\n", day.Date)
 		p := day.Points
