@@ -2,7 +2,8 @@
 
 `wwlog` unlocks the WeightWatchers data you enter in the mobile app.
 
-It provides a CLI for exporting text, Markdown, JSON, and CSV so you can analyze your data with your own tools across a selected date range.
+It provides a CLI for exporting text, Markdown, JSON, and CSV so you can analyze your data with your own
+tools across a selected date range.
 
 It also includes a TUI for browsing daily logs, comparing nutrition, and viewing insights across a selected date range.
 
@@ -83,6 +84,83 @@ wwlog --start 2026-04-20 --end 2026-04-26 --export json --output ~/Downloads/
 # Clear stored credentials
 wwlog --logout
 ```
+
+## JSON pipeline examples
+
+The `--json` flag outputs a JSON array of day logs. Each element contains the date, meals
+(morning / midday / evening / anytime arrays of food entries), and a points summary. Pipe it
+to `jq` for quick ad-hoc analysis.
+
+**Daily points summary:**
+
+```bash
+wwlog --start 2026-04-20 --end 2026-04-26 --json \
+  | jq '.[] | {date: .Date, used: .Points.DailyUsed, target: .Points.DailyTarget}'
+```
+
+**All food names and points across the range (flat list):**
+
+```bash
+wwlog --start 2026-04-20 --end 2026-04-26 --json \
+  | jq '[.[].Meals | to_entries[].value[]] | map({name: .name, pts: .pointsPrecise})'
+```
+
+**Days where you went over budget:**
+
+```bash
+wwlog --start 2026-04-20 --end 2026-04-26 --json \
+  | jq '.[] | select(.Points.DailyUsed > .Points.DailyTarget)
+        | {date: .Date, over: (.Points.DailyUsed - .Points.DailyTarget)}'
+```
+
+**Top foods by points for the week:**
+
+```bash
+wwlog --start 2026-04-20 --end 2026-04-26 --json \
+  | jq '[.[].Meals | to_entries[].value[]]
+        | group_by(.name)
+        | map({name: .[0].name, total_pts: (map(.pointsPrecise) | add)})
+        | sort_by(-.total_pts) | .[0:10]'
+```
+
+**Breakfast items sorted by calories:**
+
+```bash
+wwlog --start 2026-04-20 --end 2026-04-26 --json \
+  | jq '[.[].Meals.morning[]
+        | {name: .name,
+           kcal: (.defaultPortion.nutrition.calories * (.portionSize / .defaultPortion.size))}]
+        | sort_by(-.kcal)'
+```
+
+> The calorie calculation above mirrors what the app does internally — scale
+> `defaultPortion.nutrition.calories` by `portionSize / defaultPortion.size`. Entries where WW
+> omits calories (some protein/meat foods) will show `0`; use `--report` for accurate totals.
+
+**Average macro distribution across the range (% of calories from protein, carbs, and fat):**
+
+```bash
+wwlog --start 2026-04-20 --end 2026-04-26 --json \
+  | jq '
+      [.[].Meals | to_entries[].value[]]
+      | map(
+          (if .defaultPortion.size > 0 then .portionSize / .defaultPortion.size else 1 end) as $scale
+          | { p: (.defaultPortion.nutrition.protein * $scale),
+              c: (.defaultPortion.nutrition.carbs   * $scale),
+              f: (.defaultPortion.nutrition.fat     * $scale) }
+        )
+      | (map(.p) | add) * 4 as $pkcal
+      | (map(.c) | add) * 4 as $ckcal
+      | (map(.f) | add) * 9 as $fkcal
+      | ($pkcal + $ckcal + $fkcal) as $total
+      | { protein: "\($pkcal / $total * 100 | round)%",
+          carbs:   "\($ckcal / $total * 100 | round)%",
+          fat:     "\($fkcal / $total * 100 | round)%" }
+    '
+```
+
+> Macros are scaled to the tracked portion size, then converted to kcal using Atwater factors
+> (protein and carbs ×4, fat ×9) to match what the Insights tab shows.
 
 ## Key bindings
 
