@@ -43,9 +43,10 @@ const (
 var tabNames = []string{"Log", "Nutrition", "Insights"}
 
 type dataMsg struct {
-	logs   []*api.DayLog
-	client *api.Client
-	err    error
+	logs    []*api.DayLog
+	client  *api.Client
+	notices []string
+	err     error
 }
 
 type versionMsg struct{ latest string }
@@ -162,8 +163,8 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 					return dataMsg{err: err}
 				}
 				client := api.New(token, tld)
-				logs, err := fetchLogs(client, start, end)
-				return dataMsg{logs: logs, client: client, err: err}
+				logs, notices, err := api.LoadRange(client, start, end)
+				return dataMsg{logs: logs, client: client, notices: notices, err: err}
 			},
 			func() tea.Msg { return versionMsg{latest: api.FetchLatestVersion()} },
 		)
@@ -177,6 +178,9 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		m.logs = msg.logs
 		if msg.client != nil {
 			m.client = msg.client
+		}
+		if len(msg.notices) > 0 {
+			m.statusMsg = styleFoodPortion.Render("  " + strings.Join(msg.notices, " · "))
 		}
 		// Nutrition is embedded in each food entry — compute synchronously, no extra API calls.
 		nutrition := api.ComputeAllNutrition(m.logs)
@@ -278,8 +282,8 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 						return dataMsg{err: err}
 					}
 					client := api.New(token, tld)
-					logs, err := fetchLogs(client, start, end)
-					return dataMsg{logs: logs, client: client, err: err}
+					logs, notices, err := api.LoadRange(client, start, end)
+					return dataMsg{logs: logs, client: client, notices: notices, err: err}
 				}
 			}
 			if m.dateRangeModel.form.State == huh.StateAborted {
@@ -353,8 +357,8 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 					return dataMsg{err: err}
 				}
 				client := api.New(token, tld)
-				logs, err := fetchLogs(client, start, end)
-				return dataMsg{logs: logs, client: client, err: err}
+				logs, notices, err := api.LoadRange(client, start, end)
+				return dataMsg{logs: logs, client: client, notices: notices, err: err}
 			}
 		}
 		return m, cmd
@@ -558,22 +562,6 @@ func (m Model) contentView() string {
 
 func (m Model) contentHeight() int {
 	return m.height - 4 // header + sep + sep + status
-}
-
-func fetchLogs(client *api.Client, start, end string) ([]*api.DayLog, error) {
-	dates, err := api.DateRange(start, end)
-	if err != nil {
-		return nil, err
-	}
-	var logs []*api.DayLog
-	for _, date := range dates {
-		day, err := client.FetchDay(date)
-		if err != nil {
-			return nil, fmt.Errorf("fetch %s: %w", date, err)
-		}
-		logs = append(logs, day)
-	}
-	return logs, nil
 }
 
 func max(a, b int) int {

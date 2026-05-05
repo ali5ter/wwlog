@@ -145,7 +145,10 @@ func run(cmd *cobra.Command, _ []string) error {
 		if err != nil {
 			return fmt.Errorf("%w\nRun 'wwlog --login' to authenticate", err)
 		}
-		logs, err := loadLogs(api.New(token, tld), start, end)
+		logs, notices, err := api.LoadRange(api.New(token, tld), start, end)
+		for _, n := range notices {
+			fmt.Fprintln(os.Stderr, "note:", n)
+		}
 		if err != nil {
 			return err
 		}
@@ -190,7 +193,10 @@ func run(cmd *cobra.Command, _ []string) error {
 			return fmt.Errorf("%w\nRun 'wwlog --login' to authenticate", err)
 		}
 		client := api.New(token, tld)
-		logs, err := loadLogs(client, start, end)
+		logs, notices, err := api.LoadRange(client, start, end)
+		for _, n := range notices {
+			fmt.Fprintln(os.Stderr, "note:", n)
+		}
 		if err != nil {
 			return err
 		}
@@ -202,22 +208,6 @@ func run(cmd *cobra.Command, _ []string) error {
 
 	// TUI mode: auth and date range handled inside the TUI.
 	return tui.Run(authenticator, tld, flagStart, flagEnd, version)
-}
-
-func loadLogs(client *api.Client, start, end string) ([]*api.DayLog, error) {
-	dates, err := api.DateRange(start, end)
-	if err != nil {
-		return nil, err
-	}
-	var logs []*api.DayLog
-	for _, date := range dates {
-		day, err := client.FetchDay(date)
-		if err != nil {
-			return nil, fmt.Errorf("fetch %s: %w", date, err)
-		}
-		logs = append(logs, day)
-	}
-	return logs, nil
 }
 
 func readPassword() (string, error) {

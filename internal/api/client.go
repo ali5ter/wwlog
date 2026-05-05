@@ -3,11 +3,18 @@ package api
 import (
 	"bytes"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"net/http"
 	"strings"
 	"time"
 )
+
+// ErrOutOfWindow is returned by FetchDay when the WW my-day endpoint
+// responds with HTTP 400 — the server enforces a ~89-day backwards
+// retention window and rejects older dates outright. Callers can
+// errors.Is(err, ErrOutOfWindow) to skip the day instead of aborting.
+var ErrOutOfWindow = errors.New("date outside WW retention window")
 
 // Client is an authenticated WW API client.
 type Client struct {
@@ -39,6 +46,9 @@ func (c *Client) FetchDay(date string) (*DayLog, error) {
 	defer resp.Body.Close()
 
 	if resp.StatusCode != http.StatusOK {
+		if resp.StatusCode == http.StatusBadRequest {
+			return nil, fmt.Errorf("fetch day %s: %w", date, ErrOutOfWindow)
+		}
 		return nil, fmt.Errorf("fetch day %s: server returned %d", date, resp.StatusCode)
 	}
 
