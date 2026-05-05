@@ -1,8 +1,8 @@
 Output wwlog_demo.gif
 
 Set FontSize 13
-Set Width 1350
-Set Height 780
+Set Width 1280
+Set Height 720
 Set Padding 10
 Set Shell bash
 
