@@ -241,23 +241,20 @@ func renderHeatmap(logs []*api.DayLog, vw int) string {
 		}
 	}
 
-	first, _ := time.Parse(layout, logs[0].Date)
-	last, _ := time.Parse(layout, logs[len(logs)-1].Date)
-
-	// Render only the queried [first..last] weeks. The WW my-day endpoint
-	// returns 400 for dates outside a member's tracked window, so a fixed
-	// "year-at-a-glance" canvas would be mostly grey forever — better to
-	// stay honest about what was fetched.
-	gridStart := first.AddDate(0, 0, -((int(first.Weekday())+6)%7))
-	endMon := last.AddDate(0, 0, -((int(last.Weekday())+6)%7))
-	nWeeks := int(endMon.Sub(gridStart).Hours()/(24*7)) + 1
-	if nWeeks <= 0 {
-		return ""
-	}
+	// Fixed grid: span the WW my-day endpoint's ~89-day backwards window so
+	// the heatmap is the same width regardless of the queried range.
+	// Anchored to the Monday of the current week on the right; cells outside
+	// the queried [first..last] window render as no-data grey.
+	today := time.Now().UTC().Truncate(24 * time.Hour)
+	todayStr := today.Format(layout)
+	todayMon := today.AddDate(0, 0, -((int(today.Weekday())+6)%7))
+	earliestMon := today.AddDate(0, 0, -89)
+	earliestMon = earliestMon.AddDate(0, 0, -((int(earliestMon.Weekday())+6)%7))
+	nWeeks := int(todayMon.Sub(earliestMon).Hours()/(24*7)) + 1
 
 	var weeks []time.Time
 	for i := 0; i < nWeeks; i++ {
-		weeks = append(weeks, gridStart.AddDate(0, 0, 7*i))
+		weeks = append(weeks, earliestMon.AddDate(0, 0, 7*i))
 	}
 
 	const dayLabelW = 4 // "Mon "
@@ -284,9 +281,18 @@ func renderHeatmap(logs []*api.DayLog, vw int) string {
 		colorTeal,
 	}
 
+	// Cells use the lower half block ▄ rather than the full block █ so the
+	// top half of each terminal row stays empty — that gives a visible gap
+	// between consecutive day-rows in the same week column, breaking up the
+	// "vertical bar" appearance of solid stacked cells.
 	noDataStyle := lipgloss.NewStyle().Foreground(colorLine)
 	cellFor := func(dateStr string) string {
-		blocks := strings.Repeat("█", cellW)
+		blocks := strings.Repeat("▄", cellW)
+		// Future days within the rightmost (current) week haven't happened
+		// yet — render blank rather than no-data grey.
+		if dateStr > todayStr {
+			return strings.Repeat(" ", cellW)
+		}
 		e, inRange := days[dateStr]
 		if !inRange || !e.hasTarget {
 			return noDataStyle.Render(blocks)
@@ -358,7 +364,7 @@ func renderHeatmap(logs []*api.DayLog, vw int) string {
 	// Legend: GitHub-style "Less □ ▓ ▒ ▓ ▓ More" + over-budget caveat.
 	fmt.Fprintln(&b)
 	swatch := func(c color.Color) string {
-		return lipgloss.NewStyle().Foreground(c).Render(strings.Repeat("█", cellW))
+		return lipgloss.NewStyle().Foreground(c).Render(strings.Repeat("▄", cellW))
 	}
 	fmt.Fprintf(&b, "%sLess %s %s %s %s %s More  %s over budget  %s no data",
 		strings.Repeat(" ", dayLabelW),

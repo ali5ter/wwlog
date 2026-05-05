@@ -475,7 +475,7 @@ func makeBar(value, max float64, width int) string {
 	}
 
 	fillStyle := lipgloss.NewStyle().Foreground(barColor)
-	emptyStyle := lipgloss.NewStyle().Foreground(colorLine)
+	markerStyle := lipgloss.NewStyle().Foreground(colorMuted)
 
 	var b strings.Builder
 	if full > 0 {
@@ -487,8 +487,11 @@ func makeBar(value, max float64, width int) string {
 		emptyCells--
 	}
 	if emptyCells > 0 {
-		b.WriteString(emptyStyle.Render(strings.Repeat("█", emptyCells)))
+		b.WriteString(strings.Repeat(" ", emptyCells))
 	}
+	// Right-edge marker showing the bar's upper limit (max). Spans the full
+	// length regardless of fill, so the user can see "where 100% sits".
+	b.WriteString(markerStyle.Render("│"))
 	return b.String()
 }
 
