@@ -67,6 +67,7 @@ func newNutriModel(logs []*api.DayLog, data map[string]*api.DayNutrition, width,
 	fi.Prompt = "> "
 
 	vp := viewport.New(viewport.WithWidth(width-listWidth), viewport.WithHeight(height))
+	vp.MouseWheelEnabled = true
 
 	m := nutriModel{
 		list:        l,

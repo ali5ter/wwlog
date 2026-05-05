@@ -84,6 +84,7 @@ func newLogModel(logs []*api.DayLog, width, height int, loc locale) logModel {
 	fi.Prompt = "> "
 
 	vp := viewport.New(viewport.WithWidth(detailWidth), viewport.WithHeight(height))
+	vp.MouseWheelEnabled = true
 
 	m := logModel{
 		list:        l,
