@@ -241,20 +241,16 @@ func renderHeatmap(logs []*api.DayLog, vw int) string {
 	first, _ := time.Parse(layout, logs[0].Date)
 	last, _ := time.Parse(layout, logs[len(logs)-1].Date)
 
-	// Anchor the grid's right edge to the Monday of last's week, then expand
-	// left to at least 52 weeks (or longer if the queried range itself is
-	// wider). Cells outside the queried [first..last] window render as grey
-	// "no data" boxes — a year-at-a-glance canvas with the queried portion
-	// coloured in, GitHub-contributions style.
+	// Render only the queried [first..last] weeks. The WW my-day endpoint
+	// returns 400 for dates outside a member's tracked window, so a fixed
+	// "year-at-a-glance" canvas would be mostly grey forever — better to
+	// stay honest about what was fetched.
+	gridStart := first.AddDate(0, 0, -((int(first.Weekday())+6)%7))
 	endMon := last.AddDate(0, 0, -((int(last.Weekday())+6)%7))
-	startMon := first.AddDate(0, 0, -((int(first.Weekday())+6)%7))
-	queriedWeeks := int(endMon.Sub(startMon).Hours()/(24*7)) + 1
-	const minWeeks = 52
-	nWeeks := queriedWeeks
-	if nWeeks < minWeeks {
-		nWeeks = minWeeks
+	nWeeks := int(endMon.Sub(gridStart).Hours()/(24*7)) + 1
+	if nWeeks <= 0 {
+		return ""
 	}
-	gridStart := endMon.AddDate(0, 0, -7*(nWeeks-1))
 
 	var weeks []time.Time
 	for i := 0; i < nWeeks; i++ {
@@ -338,13 +334,17 @@ func renderHeatmap(logs []*api.DayLog, vw int) string {
 		styleFoodPortion.Render(string(hdr)))
 
 	// Day rows Mon→Sun, only Mon/Wed/Fri labelled (GitHub convention).
+	// Inter-cell gap rendered as a middle dot in the no-data colour so the
+	// boundary between adjacent cells stays visible even when neighbours
+	// share a colour (e.g. two no-data cells in a row).
+	gapStr := lipgloss.NewStyle().Foreground(colorLine).Render(strings.Repeat("·", gap))
 	dayNames := [7]string{"Mon", "", "Wed", "", "Fri", "", ""}
 	for row, name := range dayNames {
 		label := fmt.Sprintf("%-*s", dayLabelW, name)
 		fmt.Fprintf(&b, "%s", styleDetailLabel.Render(label))
 		for i, weekMon := range weeks {
 			if i > 0 && gap > 0 {
-				fmt.Fprintf(&b, "%s", strings.Repeat(" ", gap))
+				fmt.Fprintf(&b, "%s", gapStr)
 			}
 			date := weekMon.AddDate(0, 0, row)
 			fmt.Fprintf(&b, "%s", cellFor(date.Format(layout)))
