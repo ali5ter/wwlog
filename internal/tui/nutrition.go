@@ -13,8 +13,9 @@ import (
 	"charm.land/bubbles/v2/viewport"
 	tea "charm.land/bubbletea/v2"
 	"charm.land/lipgloss/v2"
+	"github.com/NimbleMarkets/ntcharts/v2/canvas"
+	"github.com/NimbleMarkets/ntcharts/v2/linechart"
 	"github.com/ali5ter/wwlog/internal/api"
-	"github.com/guptarohit/asciigraph"
 )
 
 // rdv holds reference daily values used as bar maximums.
@@ -344,14 +345,26 @@ func writeTrendTable(b *strings.Builder, logs []*api.DayLog, data map[string]*ap
 	}
 
 	n := len(logs)
-	// Y-axis labels for Calories are up to 4 digits wide + " │" = ~8 chars offset.
-	// Leave a generous margin so chart fits within vw.
-	plotW := vw - 14
-	if plotW < 8 {
-		plotW = 8
+	if n < 2 {
+		return
 	}
 
-	dateLabel := func(v float64) string {
+	plotW := vw - 2
+	if plotW < 24 {
+		plotW = 24
+	}
+	plotH := 8
+
+	axisStyle := lipgloss.NewStyle().Foreground(colorSteel)
+	labelStyle := lipgloss.NewStyle().Foreground(colorMuted)
+	lineStyle := lipgloss.NewStyle().Foreground(colorTeal)
+
+	xStep := 1
+	if n > 7 {
+		xStep = (n + 6) / 7
+	}
+
+	dateLabel := func(_ int, v float64) string {
 		i := int(math.Round(v))
 		if i < 0 || i >= len(logs) {
 			return ""
@@ -362,7 +375,6 @@ func writeTrendTable(b *strings.Builder, logs []*api.DayLog, data map[string]*ap
 		}
 		return d
 	}
-	ticks := min(n, 7) // cap so labels don't crowd on wide date ranges
 
 	for _, m := range metrics {
 		vals := make([]float64, n)
@@ -372,19 +384,36 @@ func writeTrendTable(b *strings.Builder, logs []*api.DayLog, data map[string]*ap
 			}
 		}
 		vals = clampOutliers(vals)
-		chart := asciigraph.Plot(vals,
-			asciigraph.Height(4),
-			asciigraph.Width(plotW),
-			asciigraph.SeriesColors(asciigraph.MediumAquamarine),
-			asciigraph.LabelColor(asciigraph.SlateGray),
-			asciigraph.AxisColor(asciigraph.SlateGray),
-			asciigraph.Caption(fmt.Sprintf("%s (%s)", m.label, m.unit)),
-			asciigraph.CaptionColor(asciigraph.LightSlateGray),
-			asciigraph.XAxisRange(0, float64(n-1)),
-			asciigraph.XAxisTickCount(ticks),
-			asciigraph.XAxisValueFormatter(dateLabel),
+
+		maxY := 0.0
+		for _, v := range vals {
+			if v > maxY {
+				maxY = v
+			}
+		}
+		if maxY == 0 {
+			maxY = 1
+		}
+		maxY *= 1.1 // headroom
+
+		lc := linechart.New(
+			plotW, plotH,
+			0, float64(n-1), 0, maxY,
+			linechart.WithXYSteps(xStep, 2),
+			linechart.WithStyles(axisStyle, labelStyle, lineStyle),
+			linechart.WithXLabelFormatter(dateLabel),
 		)
-		fmt.Fprintf(b, "%s\n\n", chart)
+		lc.DrawXYAxisAndLabel()
+		for i := 1; i < n; i++ {
+			lc.DrawBrailleLineWithStyle(
+				canvas.Float64Point{X: float64(i - 1), Y: vals[i-1]},
+				canvas.Float64Point{X: float64(i), Y: vals[i]},
+				lineStyle,
+			)
+		}
+
+		caption := fmt.Sprintf("%s (%s)", m.label, m.unit)
+		fmt.Fprintf(b, "%s\n%s\n\n", styleDetailLabel.Render(caption), lc.View())
 	}
 }
 
