@@ -208,6 +208,17 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		m.animNutrition, c4 = m.animNutrition.Update(msg)
 		return m, tea.Batch(c1, c2, c3, c4)
 
+	case tea.MouseClickMsg:
+		// Header tab clicks switch tabs. Only handle when a tab area exists
+		// (data loaded, no dialog open, not on splash).
+		if m.screen == screenLog && m.dialog == dialogNone && !m.loading && m.err == nil {
+			if i, ok := m.tabAtPoint(msg.X, msg.Y); ok {
+				m.activeTab = tab(i)
+				m.statusMsg = ""
+				return m, nil
+			}
+		}
+
 	case tea.KeyPressMsg:
 		// Splash: only ctrl+c quits — q is a valid character in huh text fields.
 		if m.screen == screenSplash {
@@ -368,6 +379,12 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 func (m Model) View() tea.View {
 	v := tea.NewView(m.viewContent())
 	v.AltScreen = true
+	v.MouseMode = tea.MouseModeCellMotion
+	if m.start != "" && m.end != "" {
+		v.WindowTitle = fmt.Sprintf("wwlog · %s → %s", m.start, m.end)
+	} else {
+		v.WindowTitle = "wwlog"
+	}
 	return v
 }
 
@@ -454,6 +471,30 @@ func (m Model) headerView() string {
 		Background(colorPanel).
 		Width(m.width).
 		Render(left + strings.Repeat(" ", gap) + dateRange)
+}
+
+// tabAtPoint returns the tab index at the given (x, y) terminal coordinate,
+// or false if the point is not on a tab. The header is on row 0 and the tab
+// strip starts after the "wwlog · " prefix.
+func (m Model) tabAtPoint(x, y int) (int, bool) {
+	if y != 0 {
+		return 0, false
+	}
+	cur := lipgloss.Width(styleHeaderAccent.Render("wwlog")) +
+		lipgloss.Width(styleHeader.Render(" · "))
+	for i, name := range tabNames {
+		var w int
+		if tab(i) == m.activeTab {
+			w = lipgloss.Width(styleTabActive.Render(name))
+		} else {
+			w = lipgloss.Width(styleTabInactive.Render(name))
+		}
+		if x >= cur && x < cur+w {
+			return i, true
+		}
+		cur += w
+	}
+	return 0, false
 }
 
 func (m Model) statusView() string {
