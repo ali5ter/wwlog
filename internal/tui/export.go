@@ -72,8 +72,9 @@ func newExportModel(width, height int) exportModel {
 				Description("Where to save the file (~ for home)").
 				Value(&dir).
 				Validate(validateDir),
+			huh.NewConfirm().Key("confirmed").Affirmative("Save").Negative("Cancel"),
 		),
-	).WithTheme(wwHuhTheme{}).WithWidth(w).WithShowHelp(true)
+	).WithTheme(wwHuhTheme{}).WithWidth(w).WithShowHelp(false)
 
 	return exportModel{form: form, width: width, height: height}
 }

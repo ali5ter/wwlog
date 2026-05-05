@@ -274,6 +274,7 @@ func newDateRangeModel(start, end string, width, height int) dateRangeModel {
 		huh.NewGroup(
 			huh.NewInput().Key("start").Title("From").Placeholder("YYYY-MM-DD").Value(&s).Validate(validateDate),
 			huh.NewInput().Key("end").Title("To").Placeholder("YYYY-MM-DD").Value(&e).Validate(validateDate),
+			huh.NewConfirm().Key("confirmed").Affirmative("Submit").Negative("Cancel"),
 		),
 	).WithTheme(wwHuhTheme{}).WithWidth(w).WithShowHelp(false)
 	return dateRangeModel{form: form, width: width, height: height}
