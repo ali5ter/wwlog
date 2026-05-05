@@ -241,16 +241,24 @@ func renderHeatmap(logs []*api.DayLog, vw int) string {
 	first, _ := time.Parse(layout, logs[0].Date)
 	last, _ := time.Parse(layout, logs[len(logs)-1].Date)
 
-	monOff := (int(first.Weekday()) + 6) % 7
-	gridStart := first.AddDate(0, 0, -monOff)
+	// Anchor the grid's right edge to the Monday of last's week, then expand
+	// left to at least 52 weeks (or longer if the queried range itself is
+	// wider). Cells outside the queried [first..last] window render as grey
+	// "no data" boxes — a year-at-a-glance canvas with the queried portion
+	// coloured in, GitHub-contributions style.
+	endMon := last.AddDate(0, 0, -((int(last.Weekday())+6)%7))
+	startMon := first.AddDate(0, 0, -((int(first.Weekday())+6)%7))
+	queriedWeeks := int(endMon.Sub(startMon).Hours()/(24*7)) + 1
+	const minWeeks = 52
+	nWeeks := queriedWeeks
+	if nWeeks < minWeeks {
+		nWeeks = minWeeks
+	}
+	gridStart := endMon.AddDate(0, 0, -7*(nWeeks-1))
 
 	var weeks []time.Time
-	for d := gridStart; !d.After(last); d = d.AddDate(0, 0, 7) {
-		weeks = append(weeks, d)
-	}
-	nWeeks := len(weeks)
-	if nWeeks == 0 {
-		return ""
+	for i := 0; i < nWeeks; i++ {
+		weeks = append(weeks, gridStart.AddDate(0, 0, 7*i))
 	}
 
 	const dayLabelW = 4 // "Mon "
@@ -277,14 +285,12 @@ func renderHeatmap(logs []*api.DayLog, vw int) string {
 		colorTeal,
 	}
 
+	noDataStyle := lipgloss.NewStyle().Foreground(colorLine)
 	cellFor := func(dateStr string) string {
 		blocks := strings.Repeat("█", cellW)
 		e, inRange := days[dateStr]
-		if !inRange {
-			return strings.Repeat(" ", cellW)
-		}
-		if !e.hasTarget {
-			return lipgloss.NewStyle().Foreground(colorLine).Render(blocks)
+		if !inRange || !e.hasTarget {
+			return noDataStyle.Render(blocks)
 		}
 		var c color.Color
 		switch {
@@ -351,11 +357,12 @@ func renderHeatmap(logs []*api.DayLog, vw int) string {
 	swatch := func(c color.Color) string {
 		return lipgloss.NewStyle().Foreground(c).Render(strings.Repeat("█", cellW))
 	}
-	fmt.Fprintf(&b, "%sLess %s %s %s %s %s More  %s over budget",
+	fmt.Fprintf(&b, "%sLess %s %s %s %s %s More  %s over budget  %s no data",
 		strings.Repeat(" ", dayLabelW),
 		swatch(palette[0]), swatch(palette[1]), swatch(palette[2]),
 		swatch(palette[3]), swatch(palette[4]),
-		swatch(colorPurple))
+		swatch(colorPurple),
+		swatch(colorLine))
 
 	return b.String()
 }
