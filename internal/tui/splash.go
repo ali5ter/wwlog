@@ -95,8 +95,8 @@ func (m splashModel) buildLoginForm() *huh.Form {
 		),
 	).
 		WithTheme(wwHuhTheme{}).
-		WithWidth(m.formWidth()).
-		WithShowHelp(true)
+		WithWidth(dialogContentWidth(m.width)).
+		WithShowHelp(false)
 }
 
 func (m splashModel) buildDateForm() *huh.Form {
@@ -127,8 +127,8 @@ func (m splashModel) buildDateForm() *huh.Form {
 		),
 	).
 		WithTheme(wwHuhTheme{}).
-		WithWidth(m.formWidth()).
-		WithShowHelp(true)
+		WithWidth(dialogContentWidth(m.width)).
+		WithShowHelp(false)
 }
 
 func validateDate(s string) error {
@@ -217,36 +217,44 @@ func renderGradientLogo() string {
 	return strings.Join(rendered, "\n")
 }
 
-// splashBodyH is the reserved height for the body area (form or spinner).
-// Keeping this constant ensures the logo never shifts position between phases.
-const splashBodyH = 16
-
 func (m splashModel) view() string {
-	var body string
+	var title, body, hint string
 	switch m.phase {
 	case splashChecking:
+		title = "Welcome to wwlog"
 		body = styleSplashSub.Render(m.spinner.View() + "  Checking credentials…")
-	default:
+		hint = "ctrl+c to quit"
+	case splashLogin:
+		title = "Sign in to Weight Watchers"
 		if m.form != nil {
 			body = m.form.View()
 		}
+		hint = "tab next field · enter submit · ctrl+c to quit"
+	case splashDateRange:
+		title = "Choose a date range"
+		if m.form != nil {
+			body = m.form.View()
+		}
+		hint = "tab next field · enter submit · ctrl+c to quit"
 	}
 	if m.err != "" {
-		body = lipgloss.JoinVertical(lipgloss.Center, styleError.Render("  "+m.err), "", body)
+		body = lipgloss.JoinVertical(lipgloss.Left, styleError.Render(m.err), "", body)
 	}
 
-	// Pad body to a fixed height so the logo's vertical position is identical
-	// across all phases (spinner → form transitions don't shift the logo).
-	paddedBody := lipgloss.Place(m.width, splashBodyH, lipgloss.Center, lipgloss.Top, body)
+	return splashFrame(renderDialog(title, body, hint), m.width, m.height)
+}
 
+// splashFrame renders the wwlog gradient logo above the given dialog, centred
+// in the available terminal area. Used by the splash phases and by the
+// initial-load loading view so the logo persists across the entire pre-TUI
+// experience.
+func splashFrame(dialog string, width, height int) string {
 	content := lipgloss.JoinVertical(lipgloss.Center,
-		renderGradientLogo(), "",
-		styleSplashSub.Render("Browse and export your food log"),
+		renderGradientLogo(),
 		"",
-		paddedBody,
-		styleSplashHint.Render("ctrl+c to quit"),
+		dialog,
 	)
-	return lipgloss.Place(m.width, m.height, lipgloss.Center, lipgloss.Center, content)
+	return lipgloss.Place(width, height, lipgloss.Center, lipgloss.Center, content)
 }
 
 // dateRangeModel is the in-TUI date range picker — same form as the splash

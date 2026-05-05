@@ -375,11 +375,19 @@ func (m Model) viewContent() string {
 	if m.screen == screenSplash {
 		return m.splashModel.view()
 	}
-	if m.loading {
-		return m.loadingView()
-	}
 	if m.err != nil {
 		return styleError.Render(fmt.Sprintf("Error: %v\n\nPress q to quit.", m.err))
+	}
+
+	loadingDialog := renderDialog(
+		"Loading",
+		styleSplashSub.Render(m.spinner.View()+"  Loading your food log…"),
+		"ctrl+c to quit",
+	)
+
+	// Initial load (no data yet): keep the splash frame so the logo persists.
+	if m.loading && len(m.logs) == 0 {
+		return splashFrame(loadingDialog, m.width, m.height)
 	}
 
 	sep := styleDim.Render(strings.Repeat("─", m.width))
@@ -390,6 +398,12 @@ func (m Model) viewContent() string {
 		sep,
 		m.statusView(),
 	)
+
+	// Re-load (in-TUI date range change): overlay the loading dialog on the
+	// previously-rendered TUI so the user keeps their context.
+	if m.loading {
+		return overlayDialog(main, loadingDialog, m.width, m.height)
+	}
 
 	// If a dialog is active, composite it on top of the main TUI. The Lipgloss
 	// v2 compositor draws layers in z-order at cell coordinates, so the main
@@ -419,21 +433,6 @@ func overlayDialog(bg, dialog string, width, height int) string {
 		lipgloss.NewLayer(bg),
 		lipgloss.NewLayer(dialog).X(x).Y(y).Z(1),
 	).Render()
-}
-
-func (m Model) loadingView() string {
-	spinStr := styleSplashSub.Render(fmt.Sprintf("%s  Loading your food log…", m.spinner.View()))
-	// Mirror the splash view structure exactly: paddedBody + hint appended outside,
-	// giving the same total content height so the logo sits at the same row.
-	paddedBody := lipgloss.Place(m.width, splashBodyH, lipgloss.Center, lipgloss.Top, spinStr)
-	content := lipgloss.JoinVertical(lipgloss.Center,
-		renderGradientLogo(), "",
-		styleSplashSub.Render("Browse and export your food log"),
-		"",
-		paddedBody,
-		styleSplashHint.Render("q to quit"),
-	)
-	return lipgloss.Place(m.width, m.height, lipgloss.Center, lipgloss.Center, content)
 }
 
 func (m Model) headerView() string {
