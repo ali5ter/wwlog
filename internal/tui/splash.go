@@ -5,11 +5,11 @@ import (
 	"strings"
 	"time"
 
+	"charm.land/bubbles/v2/spinner"
+	tea "charm.land/bubbletea/v2"
+	"charm.land/huh/v2"
+	"charm.land/lipgloss/v2"
 	"github.com/ali5ter/wwlog/internal/auth"
-	"github.com/charmbracelet/bubbles/spinner"
-	tea "github.com/charmbracelet/bubbletea"
-	"github.com/charmbracelet/huh"
-	"github.com/charmbracelet/lipgloss"
 )
 
 const asciiLogo = `
@@ -94,9 +94,9 @@ func (m splashModel) buildLoginForm() *huh.Form {
 				Placeholder("enter your password"),
 		),
 	).
-		WithTheme(wwHuhTheme()).
-		WithWidth(m.formWidth()).
-		WithShowHelp(true)
+		WithTheme(wwHuhTheme{}).
+		WithWidth(dialogContentWidth(m.width)).
+		WithShowHelp(false)
 }
 
 func (m splashModel) buildDateForm() *huh.Form {
@@ -126,9 +126,9 @@ func (m splashModel) buildDateForm() *huh.Form {
 				Validate(validateDate),
 		),
 	).
-		WithTheme(wwHuhTheme()).
-		WithWidth(m.formWidth()).
-		WithShowHelp(true)
+		WithTheme(wwHuhTheme{}).
+		WithWidth(dialogContentWidth(m.width)).
+		WithShowHelp(false)
 }
 
 func validateDate(s string) error {
@@ -217,36 +217,44 @@ func renderGradientLogo() string {
 	return strings.Join(rendered, "\n")
 }
 
-// splashBodyH is the reserved height for the body area (form or spinner).
-// Keeping this constant ensures the logo never shifts position between phases.
-const splashBodyH = 16
-
 func (m splashModel) view() string {
-	var body string
+	var title, body, hint string
 	switch m.phase {
 	case splashChecking:
+		title = "Welcome to wwlog"
 		body = styleSplashSub.Render(m.spinner.View() + "  Checking credentials…")
-	default:
+		hint = "ctrl+c to quit"
+	case splashLogin:
+		title = "Sign in to Weight Watchers"
 		if m.form != nil {
 			body = m.form.View()
 		}
+		hint = "tab next field · enter submit · ctrl+c to quit"
+	case splashDateRange:
+		title = "Choose a date range"
+		if m.form != nil {
+			body = m.form.View()
+		}
+		hint = "tab next field · enter submit · ctrl+c to quit"
 	}
 	if m.err != "" {
-		body = lipgloss.JoinVertical(lipgloss.Center, styleError.Render("  "+m.err), "", body)
+		body = lipgloss.JoinVertical(lipgloss.Left, styleError.Render(m.err), "", body)
 	}
 
-	// Pad body to a fixed height so the logo's vertical position is identical
-	// across all phases (spinner → form transitions don't shift the logo).
-	paddedBody := lipgloss.Place(m.width, splashBodyH, lipgloss.Center, lipgloss.Top, body)
+	return splashFrame(renderDialog(title, body, hint), m.width, m.height)
+}
 
+// splashFrame renders the wwlog gradient logo above the given dialog, centred
+// in the available terminal area. Used by the splash phases and by the
+// initial-load loading view so the logo persists across the entire pre-TUI
+// experience.
+func splashFrame(dialog string, width, height int) string {
 	content := lipgloss.JoinVertical(lipgloss.Center,
-		renderGradientLogo(), "",
-		styleSplashSub.Render("Browse and export your food log"),
+		renderGradientLogo(),
 		"",
-		paddedBody,
-		styleSplashHint.Render("ctrl+c to quit"),
+		dialog,
 	)
-	return lipgloss.Place(m.width, m.height, lipgloss.Center, lipgloss.Center, content)
+	return lipgloss.Place(width, height, lipgloss.Center, lipgloss.Center, content)
 }
 
 // dateRangeModel is the in-TUI date range picker — same form as the splash
@@ -258,13 +266,7 @@ type dateRangeModel struct {
 }
 
 func newDateRangeModel(start, end string, width, height int) dateRangeModel {
-	w := width / 2
-	if w < 44 {
-		w = 44
-	}
-	if w > 72 {
-		w = 72
-	}
+	w := dialogContentWidth(width)
 	// huh forms capture the *string values at form-init time, so we need local
 	// copies that the form fields can write into.
 	s, e := start, end
@@ -273,7 +275,7 @@ func newDateRangeModel(start, end string, width, height int) dateRangeModel {
 			huh.NewInput().Key("start").Title("From").Placeholder("YYYY-MM-DD").Value(&s).Validate(validateDate),
 			huh.NewInput().Key("end").Title("To").Placeholder("YYYY-MM-DD").Value(&e).Validate(validateDate),
 		),
-	).WithTheme(wwHuhTheme()).WithWidth(w).WithShowHelp(true)
+	).WithTheme(wwHuhTheme{}).WithWidth(w).WithShowHelp(false)
 	return dateRangeModel{form: form, width: width, height: height}
 }
 
@@ -292,23 +294,14 @@ func (m dateRangeModel) view() string {
 	if m.width == 0 || m.height == 0 {
 		return ""
 	}
-	// Use the same fixed-height body region as the splash screen so the logo
-	// never shifts position as the form transitions between fields.
-	paddedBody := lipgloss.Place(m.width, splashBodyH, lipgloss.Center, lipgloss.Top, m.form.View())
-	content := lipgloss.JoinVertical(lipgloss.Center,
-		renderGradientLogo(), "",
-		styleSplashTitle.Render("Change date range"),
-		styleSplashSub.Render("Browse and export your food log"),
-		"",
-		paddedBody,
-		styleSplashHint.Render("esc to cancel · ctrl+c to quit"),
-	)
-	return lipgloss.Place(m.width, m.height, lipgloss.Center, lipgloss.Center, content)
+	return renderDialog("Change date range", m.form.View(), "esc cancel · enter submit · tab next field")
 }
 
-// wwHuhTheme returns a huh theme styled with the WW colour palette.
-func wwHuhTheme() *huh.Theme {
-	t := huh.ThemeCharm()
+// wwHuhTheme is a huh.Theme styled with the WW colour palette.
+type wwHuhTheme struct{}
+
+func (wwHuhTheme) Theme(isDark bool) *huh.Styles {
+	t := huh.ThemeCharm(isDark)
 
 	teal := lipgloss.Color("#00B388")
 	purple := lipgloss.Color("#6B4C9A")

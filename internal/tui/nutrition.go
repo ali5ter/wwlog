@@ -2,17 +2,18 @@ package tui
 
 import (
 	"fmt"
+	"image/color"
 	"math"
 	"sort"
 	"strings"
 
+	"charm.land/bubbles/v2/key"
+	"charm.land/bubbles/v2/list"
+	"charm.land/bubbles/v2/textinput"
+	"charm.land/bubbles/v2/viewport"
+	tea "charm.land/bubbletea/v2"
+	"charm.land/lipgloss/v2"
 	"github.com/ali5ter/wwlog/internal/api"
-	"github.com/charmbracelet/bubbles/key"
-	"github.com/charmbracelet/bubbles/list"
-	"github.com/charmbracelet/bubbles/textinput"
-	"github.com/charmbracelet/bubbles/viewport"
-	tea "github.com/charmbracelet/bubbletea"
-	"github.com/charmbracelet/lipgloss"
 	"github.com/guptarohit/asciigraph"
 )
 
@@ -59,11 +60,13 @@ func newNutriModel(logs []*api.DayLog, data map[string]*api.DayNutrition, width,
 
 	fi := textinput.New()
 	fi.Placeholder = "filter by date (e.g. Jan, 04)"
-	fi.PromptStyle = styleFilterPrompt
-	fi.TextStyle = styleFilterText
+	fiStyles := fi.Styles()
+	fiStyles.Focused.Prompt = styleFilterPrompt
+	fiStyles.Focused.Text = styleFilterText
+	fi.SetStyles(fiStyles)
 	fi.Prompt = "> "
 
-	vp := viewport.New(width-listWidth, height)
+	vp := viewport.New(viewport.WithWidth(width-listWidth), viewport.WithHeight(height))
 
 	m := nutriModel{
 		list:        l,
@@ -87,7 +90,7 @@ func (m nutriModel) update(msg tea.Msg) (nutriModel, tea.Cmd) {
 	var cmds []tea.Cmd
 	var cmd tea.Cmd
 
-	if msg, ok := msg.(tea.KeyMsg); ok {
+	if msg, ok := msg.(tea.KeyPressMsg); ok {
 		if m.filtering {
 			switch msg.String() {
 			case "enter", "esc":
@@ -113,10 +116,10 @@ func (m nutriModel) update(msg tea.Msg) (nutriModel, tea.Cmd) {
 				m.filter.Focus()
 				return m, textinput.Blink
 			case key.Matches(msg, keys.ScrollUp):
-				m.detail.LineUp(3)
+				m.detail.ScrollUp(3)
 				return m, nil
 			case key.Matches(msg, keys.ScrollDown):
-				m.detail.LineDown(3)
+				m.detail.ScrollDown(3)
 				return m, nil
 			}
 		}
@@ -135,7 +138,7 @@ func (m nutriModel) update(msg tea.Msg) (nutriModel, tea.Cmd) {
 
 	if !selChanged {
 		// Only forward non-key messages to the viewport — same reasoning as logModel.
-		if _, isKey := msg.(tea.KeyMsg); !isKey {
+		if _, isKey := msg.(tea.KeyPressMsg); !isKey {
 			m.detail, cmd = m.detail.Update(msg)
 			cmds = append(cmds, cmd)
 		}
@@ -206,8 +209,8 @@ func (m *nutriModel) resize(width, height int) {
 	listWidth := width / 3
 	m.list.SetSize(listWidth, height-2) // -2 for filter bar + separator
 	detailWidth := width - listWidth
-	m.detail.Width = detailWidth
-	m.detail.Height = height
+	m.detail.SetWidth(detailWidth)
+	m.detail.SetHeight(height)
 	m.detail.SetContent(m.renderDetail())
 }
 
@@ -225,7 +228,7 @@ func (m *nutriModel) renderDetail() string {
 		return styleFoodPortion.Render("No data for this date.")
 	}
 
-	vw := m.detail.Width - 2
+	vw := m.detail.Width() - 2
 	if vw < 40 {
 		vw = 40
 	}
@@ -387,7 +390,7 @@ func makeBar(value, max float64, width int) string {
 		filled = width
 	}
 	empty := width - filled
-	barColor := colorTeal
+	barColor := color.Color(colorTeal)
 	if max > 0 && value > max {
 		barColor = colorPurple
 	}

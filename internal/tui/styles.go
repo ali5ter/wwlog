@@ -2,12 +2,11 @@ package tui
 
 import (
 	"fmt"
-	"strconv"
-	"strings"
+	"image/color"
 
-	"github.com/charmbracelet/bubbles/key"
-	"github.com/charmbracelet/bubbles/list"
-	"github.com/charmbracelet/lipgloss"
+	"charm.land/bubbles/v2/key"
+	"charm.land/bubbles/v2/list"
+	"charm.land/lipgloss/v2"
 )
 
 // newDateList returns a list.Model pre-configured with the WW palette and the
@@ -41,22 +40,15 @@ func truncate(s string, max int) string {
 	return string(r[:max-1]) + "…"
 }
 
-// lerpColor linearly interpolates between two hex colours at position t ∈ [0,1].
-func lerpColor(a, b lipgloss.Color, t float64) lipgloss.Color {
-	ar, ag, ab := hexToRGB(string(a))
-	br, bg, bb := hexToRGB(string(b))
-	lerp := func(x, y uint8) uint8 {
-		return uint8(float64(x) + (float64(y)-float64(x))*t)
+// lerpColor linearly interpolates between two colours at position t ∈ [0,1].
+func lerpColor(a, b color.Color, t float64) color.Color {
+	ar, ag, ab, _ := a.RGBA()
+	br, bg, bb, _ := b.RGBA()
+	lerp := func(x, y uint32) uint8 {
+		fx, fy := float64(x>>8), float64(y>>8)
+		return uint8(fx + (fy-fx)*t)
 	}
 	return lipgloss.Color(fmt.Sprintf("#%02X%02X%02X", lerp(ar, br), lerp(ag, bg), lerp(ab, bb)))
-}
-
-func hexToRGB(hex string) (uint8, uint8, uint8) {
-	hex = strings.TrimPrefix(hex, "#")
-	r, _ := strconv.ParseUint(hex[0:2], 16, 8)
-	g, _ := strconv.ParseUint(hex[2:4], 16, 8)
-	b, _ := strconv.ParseUint(hex[4:6], 16, 8)
-	return uint8(r), uint8(g), uint8(b)
 }
 
 // WW-inspired colour palette.
@@ -166,4 +158,20 @@ var (
 
 	styleSplashInputPrompt = lipgloss.NewStyle().
 				Foreground(colorPurple)
+
+	// Dialog overlay styles — compact bordered box for in-TUI dialogs.
+	styleDialogBox = lipgloss.NewStyle().
+			Border(lipgloss.RoundedBorder()).
+			BorderForeground(colorTeal).
+			Background(colorPanel).
+			Padding(1, 2)
+
+	styleDialogTitle = lipgloss.NewStyle().
+				Foreground(colorTeal).
+				Background(colorPanel).
+				Bold(true)
+
+	styleDialogHint = lipgloss.NewStyle().
+			Foreground(colorMuted).
+			Background(colorPanel)
 )

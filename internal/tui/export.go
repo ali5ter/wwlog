@@ -6,11 +6,10 @@ import (
 	"path/filepath"
 	"strings"
 
+	tea "charm.land/bubbletea/v2"
+	"charm.land/huh/v2"
 	"github.com/ali5ter/wwlog/internal/api"
 	"github.com/ali5ter/wwlog/internal/pipeline"
-	tea "github.com/charmbracelet/bubbletea"
-	"github.com/charmbracelet/huh"
-	"github.com/charmbracelet/lipgloss"
 )
 
 type exportModel struct {
@@ -47,13 +46,7 @@ func expandHome(s string) string {
 }
 
 func newExportModel(width, height int) exportModel {
-	w := width - 8
-	if w > 60 {
-		w = 60
-	}
-	if w < 44 {
-		w = 44
-	}
+	w := dialogContentWidth(width)
 
 	home, _ := os.UserHomeDir()
 	dir := home
@@ -80,7 +73,7 @@ func newExportModel(width, height int) exportModel {
 				Value(&dir).
 				Validate(validateDir),
 		),
-	).WithTheme(wwHuhTheme()).WithWidth(w).WithShowHelp(true)
+	).WithTheme(wwHuhTheme{}).WithWidth(w).WithShowHelp(true)
 
 	return exportModel{form: form, width: width, height: height}
 }
@@ -97,14 +90,7 @@ func (m exportModel) update(msg tea.Msg) (exportModel, tea.Cmd) {
 }
 
 func (m exportModel) view() string {
-	content := lipgloss.JoinVertical(lipgloss.Center,
-		renderGradientLogo(), "",
-		styleSplashTitle.Render("Export your log"),
-		styleSplashSub.Render("Choose a format and directory, then press enter"), "",
-		m.form.View(), "",
-		styleSplashHint.Render("esc to cancel · ctrl+c to quit"),
-	)
-	return lipgloss.Place(m.width, m.height, lipgloss.Center, lipgloss.Center, content)
+	return renderDialog("Export your log", m.form.View(), "esc cancel · enter submit · tab next field")
 }
 
 func runExport(format, dir, start, end string, logs []*api.DayLog) tea.Cmd {
