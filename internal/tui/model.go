@@ -6,13 +6,13 @@ import (
 	"strings"
 	"time"
 
+	"charm.land/bubbles/v2/key"
+	"charm.land/bubbles/v2/spinner"
+	tea "charm.land/bubbletea/v2"
+	"charm.land/huh/v2"
+	"charm.land/lipgloss/v2"
 	"github.com/ali5ter/wwlog/internal/api"
 	"github.com/ali5ter/wwlog/internal/auth"
-	"github.com/charmbracelet/bubbles/key"
-	"github.com/charmbracelet/bubbles/spinner"
-	tea "github.com/charmbracelet/bubbletea"
-	"github.com/charmbracelet/huh"
-	"github.com/charmbracelet/lipgloss"
 )
 
 type appScreen int
@@ -20,8 +20,16 @@ type appScreen int
 const (
 	screenSplash appScreen = iota
 	screenLog
-	screenExport
-	screenDateRange
+)
+
+// dialogKind identifies which (if any) modal dialog is currently open
+// over the main Log screen.
+type dialogKind int
+
+const (
+	dialogNone dialogKind = iota
+	dialogDateRange
+	dialogExport
 )
 
 type tab int
@@ -59,6 +67,7 @@ type Model struct {
 	width  int
 	height int
 	screen appScreen
+	dialog dialogKind
 
 	spinner       spinner.Model
 	animLog       spinner.Model
@@ -109,7 +118,7 @@ func Run(authObj *auth.Auth, tld, preStart, preEnd string, version string) error
 		version:       version,
 	}
 
-	p := tea.NewProgram(m, tea.WithAltScreen())
+	p := tea.NewProgram(m)
 	_, err := p.Run()
 	return err
 }
@@ -199,23 +208,23 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		m.animNutrition, c4 = m.animNutrition.Update(msg)
 		return m, tea.Batch(c1, c2, c3, c4)
 
-	case tea.KeyMsg:
+	case tea.KeyPressMsg:
 		// Splash: only ctrl+c quits — q is a valid character in huh text fields.
 		if m.screen == screenSplash {
-			if msg.Type == tea.KeyCtrlC {
+			if msg.String() == "ctrl+c" {
 				return m, tea.Quit
 			}
 			var cmd tea.Cmd
 			m.splashModel, cmd = m.splashModel.update(msg)
 			return m, cmd
 		}
-		// Export: esc cancels, ctrl+c quits, everything else goes to huh.
-		if m.screen == screenExport {
-			if msg.Type == tea.KeyCtrlC {
+		// Export dialog: esc cancels, ctrl+c quits, everything else goes to huh.
+		if m.dialog == dialogExport {
+			if msg.String() == "ctrl+c" {
 				return m, tea.Quit
 			}
-			if msg.Type == tea.KeyEsc {
-				m.screen = screenLog
+			if msg.String() == "esc" {
+				m.dialog = dialogNone
 				return m, nil
 			}
 			var cmd tea.Cmd
@@ -223,22 +232,22 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			if m.exportModel.form.State == huh.StateCompleted {
 				format := m.exportModel.form.GetString("format")
 				dir := m.exportModel.form.GetString("dir")
-				m.screen = screenLog
+				m.dialog = dialogNone
 				m.statusMsg = styleFoodPortion.Render("  Saving…")
 				return m, runExport(format, dir, m.start, m.end, m.logs)
 			}
 			if m.exportModel.form.State == huh.StateAborted {
-				m.screen = screenLog
+				m.dialog = dialogNone
 			}
 			return m, cmd
 		}
-		// Date range picker: esc cancels, ctrl+c quits, enter submits.
-		if m.screen == screenDateRange {
-			if msg.Type == tea.KeyCtrlC {
+		// Date range dialog: esc cancels, ctrl+c quits, enter submits.
+		if m.dialog == dialogDateRange {
+			if msg.String() == "ctrl+c" {
 				return m, tea.Quit
 			}
-			if msg.Type == tea.KeyEsc {
-				m.screen = screenLog
+			if msg.String() == "esc" {
+				m.dialog = dialogNone
 				return m, nil
 			}
 			var cmd tea.Cmd
@@ -246,7 +255,7 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			if m.dateRangeModel.form.State == huh.StateCompleted {
 				m.start = m.dateRangeModel.form.GetString("start")
 				m.end = m.dateRangeModel.form.GetString("end")
-				m.screen = screenLog
+				m.dialog = dialogNone
 				m.loading = true
 				authObj := m.authObj
 				tld := m.tld
@@ -263,7 +272,7 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 				}
 			}
 			if m.dateRangeModel.form.State == huh.StateAborted {
-				m.screen = screenLog
+				m.dialog = dialogNone
 			}
 			return m, cmd
 		}
@@ -278,11 +287,11 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			switch {
 			case key.Matches(msg, keys.Export):
 				m.exportModel = newExportModel(m.width, m.height)
-				m.screen = screenExport
+				m.dialog = dialogExport
 				return m, m.exportModel.form.Init()
 			case key.Matches(msg, keys.DateRange):
 				m.dateRangeModel = newDateRangeModel(m.start, m.end, m.width, m.height)
-				m.screen = screenDateRange
+				m.dialog = dialogDateRange
 				return m, m.dateRangeModel.form.Init()
 			case key.Matches(msg, keys.TabNext):
 				m.activeTab = (m.activeTab + 1) % tab(len(tabNames))
@@ -296,33 +305,33 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		}
 	}
 
-	// Route non-key messages to splash, export, or date-range screens.
+	// Route non-key messages to splash or active dialog.
 	if m.screen == screenSplash {
 		var cmd tea.Cmd
 		m.splashModel, cmd = m.splashModel.update(msg)
 		return m, cmd
 	}
-	if m.screen == screenExport {
+	if m.dialog == dialogExport {
 		var cmd tea.Cmd
 		m.exportModel, cmd = m.exportModel.update(msg)
 		// huh may complete via an internal message rather than a KeyMsg.
 		if m.exportModel.form.State == huh.StateCompleted {
 			format := m.exportModel.form.GetString("format")
 			dir := m.exportModel.form.GetString("dir")
-			m.screen = screenLog
+			m.dialog = dialogNone
 			m.statusMsg = styleFoodPortion.Render("  Saving…")
 			return m, runExport(format, dir, m.start, m.end, m.logs)
 		}
 		return m, cmd
 	}
-	if m.screen == screenDateRange {
+	if m.dialog == dialogDateRange {
 		var cmd tea.Cmd
 		m.dateRangeModel, cmd = m.dateRangeModel.update(msg)
 		// huh may complete via an internal message rather than a KeyMsg.
 		if m.dateRangeModel.form.State == huh.StateCompleted {
 			m.start = m.dateRangeModel.form.GetString("start")
 			m.end = m.dateRangeModel.form.GetString("end")
-			m.screen = screenLog
+			m.dialog = dialogNone
 			m.loading = true
 			authObj := m.authObj
 			tld := m.tld
@@ -356,15 +365,15 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	return m, cmd
 }
 
-func (m Model) View() string {
+func (m Model) View() tea.View {
+	v := tea.NewView(m.viewContent())
+	v.AltScreen = true
+	return v
+}
+
+func (m Model) viewContent() string {
 	if m.screen == screenSplash {
 		return m.splashModel.view()
-	}
-	if m.screen == screenExport {
-		return m.exportModel.view()
-	}
-	if m.screen == screenDateRange {
-		return m.dateRangeModel.view()
 	}
 	if m.loading {
 		return m.loadingView()
@@ -374,13 +383,42 @@ func (m Model) View() string {
 	}
 
 	sep := styleDim.Render(strings.Repeat("─", m.width))
-	return lipgloss.JoinVertical(lipgloss.Left,
+	main := lipgloss.JoinVertical(lipgloss.Left,
 		m.headerView(),
 		sep,
 		m.contentView(),
 		sep,
 		m.statusView(),
 	)
+
+	// If a dialog is active, composite it on top of the main TUI. The Lipgloss
+	// v2 compositor draws layers in z-order at cell coordinates, so the main
+	// content stays visible behind/around the dialog box.
+	switch m.dialog {
+	case dialogDateRange:
+		return overlayDialog(main, m.dateRangeModel.view(), m.width, m.height)
+	case dialogExport:
+		return overlayDialog(main, m.exportModel.view(), m.width, m.height)
+	}
+	return main
+}
+
+// overlayDialog composites a dialog box on top of the main TUI background using
+// the Lipgloss v2 compositor. The dialog is centred horizontally and vertically.
+func overlayDialog(bg, dialog string, width, height int) string {
+	dw, dh := lipgloss.Size(dialog)
+	x := (width - dw) / 2
+	if x < 0 {
+		x = 0
+	}
+	y := (height - dh) / 2
+	if y < 0 {
+		y = 0
+	}
+	return lipgloss.NewCompositor(
+		lipgloss.NewLayer(bg),
+		lipgloss.NewLayer(dialog).X(x).Y(y).Z(1),
+	).Render()
 }
 
 func (m Model) loadingView() string {
