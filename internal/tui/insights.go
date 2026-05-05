@@ -2,14 +2,15 @@ package tui
 
 import (
 	"fmt"
+	"image/color"
 	"strings"
 	"time"
 
+	"charm.land/bubbles/v2/key"
+	"charm.land/bubbles/v2/viewport"
+	tea "charm.land/bubbletea/v2"
+	"charm.land/lipgloss/v2"
 	"github.com/ali5ter/wwlog/internal/api"
-	"github.com/charmbracelet/bubbles/key"
-	"github.com/charmbracelet/bubbles/viewport"
-	tea "github.com/charmbracelet/bubbletea"
-	"github.com/charmbracelet/lipgloss"
 )
 
 type insightsModel struct {
@@ -21,7 +22,7 @@ type insightsModel struct {
 }
 
 func newInsightsModel(logs []*api.DayLog, width, height int) insightsModel {
-	vp := viewport.New(width-2, height)
+	vp := viewport.New(viewport.WithWidth(width-2), viewport.WithHeight(height))
 	m := insightsModel{
 		viewport:    vp,
 		logs:        logs,
@@ -34,13 +35,13 @@ func newInsightsModel(logs []*api.DayLog, width, height int) insightsModel {
 }
 
 func (m insightsModel) update(msg tea.Msg) (insightsModel, tea.Cmd) {
-	if msg, ok := msg.(tea.KeyMsg); ok {
+	if msg, ok := msg.(tea.KeyPressMsg); ok {
 		switch {
 		case key.Matches(msg, keys.ScrollUp):
-			m.viewport.LineUp(3)
+			m.viewport.ScrollUp(3)
 			return m, nil
 		case key.Matches(msg, keys.ScrollDown):
-			m.viewport.LineDown(3)
+			m.viewport.ScrollDown(3)
 			return m, nil
 		}
 	}
@@ -59,8 +60,8 @@ func (m *insightsModel) resize(width, height int) {
 	}
 	m.width = width
 	m.height = height
-	m.viewport.Width = width - 2
-	m.viewport.Height = height
+	m.viewport.SetWidth(width - 2)
+	m.viewport.SetHeight(height)
 	m.viewport.SetContent(m.render())
 }
 
@@ -275,20 +276,20 @@ func renderHeatmap(logs []*api.DayLog, vw int) string {
 		if !e.hasTarget {
 			return lipgloss.NewStyle().Foreground(colorLine).Render(blocks)
 		}
-		var color lipgloss.Color
+		var c color.Color
 		switch {
 		case e.ratio > 1.02:
-			color = colorPurple
+			c = colorPurple
 		case e.ratio >= 0.85:
-			color = colorTeal
+			c = colorTeal
 		default:
 			t := e.ratio / 0.85
 			if t < 0 {
 				t = 0
 			}
-			color = lerpColor(darkTeal, colorTeal, t)
+			c = lerpColor(darkTeal, colorTeal, t)
 		}
-		return lipgloss.NewStyle().Foreground(color).Render(blocks)
+		return lipgloss.NewStyle().Foreground(c).Render(blocks)
 	}
 
 	var b strings.Builder

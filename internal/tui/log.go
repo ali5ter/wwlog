@@ -6,13 +6,13 @@ import (
 	"sort"
 	"strings"
 
+	"charm.land/bubbles/v2/key"
+	"charm.land/bubbles/v2/list"
+	"charm.land/bubbles/v2/textinput"
+	"charm.land/bubbles/v2/viewport"
+	tea "charm.land/bubbletea/v2"
+	"charm.land/lipgloss/v2"
 	"github.com/ali5ter/wwlog/internal/api"
-	"github.com/charmbracelet/bubbles/key"
-	"github.com/charmbracelet/bubbles/list"
-	"github.com/charmbracelet/bubbles/textinput"
-	"github.com/charmbracelet/bubbles/viewport"
-	tea "github.com/charmbracelet/bubbletea"
-	"github.com/charmbracelet/lipgloss"
 )
 
 type sortMode int
@@ -77,11 +77,13 @@ func newLogModel(logs []*api.DayLog, width, height int, loc locale) logModel {
 
 	fi := textinput.New()
 	fi.Placeholder = "filter by date (e.g. Jan, 04)"
-	fi.PromptStyle = styleFilterPrompt
-	fi.TextStyle = styleFilterText
+	fiStyles := fi.Styles()
+	fiStyles.Focused.Prompt = styleFilterPrompt
+	fiStyles.Focused.Text = styleFilterText
+	fi.SetStyles(fiStyles)
 	fi.Prompt = "> "
 
-	vp := viewport.New(detailWidth, height)
+	vp := viewport.New(viewport.WithWidth(detailWidth), viewport.WithHeight(height))
 
 	m := logModel{
 		list:        l,
@@ -104,7 +106,7 @@ func (m logModel) update(msg tea.Msg) (logModel, tea.Cmd) {
 	var cmds []tea.Cmd
 	var cmd tea.Cmd
 
-	if msg, ok := msg.(tea.KeyMsg); ok {
+	if msg, ok := msg.(tea.KeyPressMsg); ok {
 		if m.filtering {
 			switch msg.String() {
 			case "enter", "esc":
@@ -130,15 +132,15 @@ func (m logModel) update(msg tea.Msg) (logModel, tea.Cmd) {
 				m.filter.Focus()
 				return m, textinput.Blink
 			case key.Matches(msg, keys.ScrollUp):
-				m.detail.LineUp(3)
+				m.detail.ScrollUp(3)
 				return m, nil
 			case key.Matches(msg, keys.ScrollDown):
-				m.detail.LineDown(3)
+				m.detail.ScrollDown(3)
 				return m, nil
 			case key.Matches(msg, keys.Sort):
 				m.sort = m.sort.next()
 				if m.selected < len(m.logs) {
-					m.detail.SetContent(renderDay(m.logs[m.selected], m.detail.Width-2, m.sort, m.locale))
+					m.detail.SetContent(renderDay(m.logs[m.selected], m.detail.Width()-2, m.sort, m.locale))
 					m.detail.GotoTop()
 				}
 				return m, nil
@@ -152,7 +154,7 @@ func (m logModel) update(msg tea.Msg) (logModel, tea.Cmd) {
 	selChanged := false
 	if i := m.list.Index(); i != m.selected && i < len(m.logs) {
 		m.selected = i
-		m.detail.SetContent(renderDay(m.logs[i], m.detail.Width-2, m.sort, m.locale))
+		m.detail.SetContent(renderDay(m.logs[i], m.detail.Width()-2, m.sort, m.locale))
 		m.detail.GotoTop()
 		selChanged = true
 	}
@@ -162,7 +164,7 @@ func (m logModel) update(msg tea.Msg) (logModel, tea.Cmd) {
 		// handled above (ScrollUp/ScrollDown) or consumed by the list.
 		// Forwarding keys here causes the viewport to scroll when the list
 		// is at its first or last item and the navigation key has no effect.
-		if _, isKey := msg.(tea.KeyMsg); !isKey {
+		if _, isKey := msg.(tea.KeyPressMsg); !isKey {
 			m.detail, cmd = m.detail.Update(msg)
 			cmds = append(cmds, cmd)
 		}
@@ -189,7 +191,7 @@ func (m *logModel) applyFilter() {
 	m.list.SetItems(items)
 	m.selected = 0
 	if len(filtered) > 0 {
-		m.detail.SetContent(renderDay(filtered[0], m.detail.Width-2, m.sort, m.locale))
+		m.detail.SetContent(renderDay(filtered[0], m.detail.Width()-2, m.sort, m.locale))
 	} else {
 		m.detail.SetContent(styleFoodPortion.Render("No matching dates."))
 	}
@@ -227,8 +229,8 @@ func (m *logModel) resize(width, height int) {
 	listHeight := height - 2
 	m.list.SetSize(listWidth, listHeight)
 	detailWidth := width - listWidth
-	m.detail.Width = detailWidth
-	m.detail.Height = height
+	m.detail.SetWidth(detailWidth)
+	m.detail.SetHeight(height)
 	if m.selected < len(m.logs) && len(m.logs) > 0 {
 		m.detail.SetContent(renderDay(m.logs[m.selected], detailWidth-2, m.sort, m.locale))
 	}

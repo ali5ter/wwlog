@@ -5,11 +5,11 @@ import (
 	"strings"
 	"time"
 
+	"charm.land/bubbles/v2/spinner"
+	tea "charm.land/bubbletea/v2"
+	"charm.land/huh/v2"
+	"charm.land/lipgloss/v2"
 	"github.com/ali5ter/wwlog/internal/auth"
-	"github.com/charmbracelet/bubbles/spinner"
-	tea "github.com/charmbracelet/bubbletea"
-	"github.com/charmbracelet/huh"
-	"github.com/charmbracelet/lipgloss"
 )
 
 const asciiLogo = `
@@ -94,7 +94,7 @@ func (m splashModel) buildLoginForm() *huh.Form {
 				Placeholder("enter your password"),
 		),
 	).
-		WithTheme(wwHuhTheme()).
+		WithTheme(wwHuhTheme{}).
 		WithWidth(m.formWidth()).
 		WithShowHelp(true)
 }
@@ -126,7 +126,7 @@ func (m splashModel) buildDateForm() *huh.Form {
 				Validate(validateDate),
 		),
 	).
-		WithTheme(wwHuhTheme()).
+		WithTheme(wwHuhTheme{}).
 		WithWidth(m.formWidth()).
 		WithShowHelp(true)
 }
@@ -258,13 +258,7 @@ type dateRangeModel struct {
 }
 
 func newDateRangeModel(start, end string, width, height int) dateRangeModel {
-	w := width / 2
-	if w < 44 {
-		w = 44
-	}
-	if w > 72 {
-		w = 72
-	}
+	w := dialogContentWidth(width)
 	// huh forms capture the *string values at form-init time, so we need local
 	// copies that the form fields can write into.
 	s, e := start, end
@@ -273,7 +267,7 @@ func newDateRangeModel(start, end string, width, height int) dateRangeModel {
 			huh.NewInput().Key("start").Title("From").Placeholder("YYYY-MM-DD").Value(&s).Validate(validateDate),
 			huh.NewInput().Key("end").Title("To").Placeholder("YYYY-MM-DD").Value(&e).Validate(validateDate),
 		),
-	).WithTheme(wwHuhTheme()).WithWidth(w).WithShowHelp(true)
+	).WithTheme(wwHuhTheme{}).WithWidth(w).WithShowHelp(false)
 	return dateRangeModel{form: form, width: width, height: height}
 }
 
@@ -292,23 +286,14 @@ func (m dateRangeModel) view() string {
 	if m.width == 0 || m.height == 0 {
 		return ""
 	}
-	// Use the same fixed-height body region as the splash screen so the logo
-	// never shifts position as the form transitions between fields.
-	paddedBody := lipgloss.Place(m.width, splashBodyH, lipgloss.Center, lipgloss.Top, m.form.View())
-	content := lipgloss.JoinVertical(lipgloss.Center,
-		renderGradientLogo(), "",
-		styleSplashTitle.Render("Change date range"),
-		styleSplashSub.Render("Browse and export your food log"),
-		"",
-		paddedBody,
-		styleSplashHint.Render("esc to cancel · ctrl+c to quit"),
-	)
-	return lipgloss.Place(m.width, m.height, lipgloss.Center, lipgloss.Center, content)
+	return renderDialog("Change date range", m.form.View(), "esc cancel · enter submit · tab next field")
 }
 
-// wwHuhTheme returns a huh theme styled with the WW colour palette.
-func wwHuhTheme() *huh.Theme {
-	t := huh.ThemeCharm()
+// wwHuhTheme is a huh.Theme styled with the WW colour palette.
+type wwHuhTheme struct{}
+
+func (wwHuhTheme) Theme(isDark bool) *huh.Styles {
+	t := huh.ThemeCharm(isDark)
 
 	teal := lipgloss.Color("#00B388")
 	purple := lipgloss.Color("#6B4C9A")
