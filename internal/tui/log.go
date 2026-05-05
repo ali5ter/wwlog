@@ -149,6 +149,20 @@ func (m logModel) update(msg tea.Msg) (logModel, tea.Cmd) {
 		}
 	}
 
+	// Mouse wheel scrolls the detail viewport, not the date list.
+	if _, ok := msg.(tea.MouseWheelMsg); ok {
+		m.detail, cmd = m.detail.Update(msg)
+		return m, cmd
+	}
+
+	// Click on a date row in the list pane selects that row.
+	if click, ok := msg.(tea.MouseClickMsg); ok {
+		if idx, ok := m.dateRowAtPoint(click.X, click.Y); ok {
+			m.list.Select(idx)
+			// Drive the same selection-change path as keyboard nav below.
+		}
+	}
+
 	m.list, cmd = m.list.Update(msg)
 	cmds = append(cmds, cmd)
 
@@ -219,6 +233,39 @@ func (m logModel) view() string {
 	detailPane := lipgloss.NewStyle().Width(detailWidth).Padding(0, 1).Render(m.detail.View())
 	return lipgloss.JoinHorizontal(lipgloss.Top, listPane, detailPane)
 }
+
+// dateRowAtPoint returns the absolute list index at the given terminal
+// coordinate, or false if the point is not on a list row. Layout assumes
+// the global TUI frame: header (row 0), separator (row 1), then the tab
+// content begins. Inside the Log/Nutrition list pane, a filter bar and a
+// separator occupy the first two rows; date rows follow with the default
+// delegate's item height + 1 row of spacing between items.
+func (m logModel) dateRowAtPoint(x, y int) (int, bool) {
+	listWidth := m.width / 3
+	if x < 0 || x >= listWidth {
+		return 0, false
+	}
+	const headerRows = 2 // global header + separator
+	const filterRows = 2 // filter bar + separator inside the list pane
+	rowStride := defaultDelegateRowStride()
+	rowsTop := headerRows + filterRows
+	if y < rowsTop {
+		return 0, false
+	}
+	first := m.list.Paginator.Page * m.list.Paginator.PerPage
+	offset := (y - rowsTop) / rowStride
+	idx := first + offset
+	items := m.list.Items()
+	if idx < 0 || idx >= len(items) {
+		return 0, false
+	}
+	return idx, true
+}
+
+// defaultDelegateRowStride returns the on-screen rows occupied by one item
+// plus the spacing below it under bubbles' default delegate (height 2 +
+// spacing 1 = 3 rows per item slot).
+func defaultDelegateRowStride() int { return 3 }
 
 func (m *logModel) resize(width, height int) {
 	if !m.initialized {

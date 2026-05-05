@@ -126,6 +126,19 @@ func (m nutriModel) update(msg tea.Msg) (nutriModel, tea.Cmd) {
 		}
 	}
 
+	// Mouse wheel scrolls the detail viewport, not the date list.
+	if _, ok := msg.(tea.MouseWheelMsg); ok {
+		m.detail, cmd = m.detail.Update(msg)
+		return m, cmd
+	}
+
+	// Click on a date row in the list pane selects that row.
+	if click, ok := msg.(tea.MouseClickMsg); ok {
+		if idx, ok := m.dateRowAtPoint(click.X, click.Y); ok {
+			m.list.Select(idx)
+		}
+	}
+
 	m.list, cmd = m.list.Update(msg)
 	cmds = append(cmds, cmd)
 
@@ -199,6 +212,31 @@ func (m *nutriModel) applyFilter() {
 		m.detail.SetContent(styleFoodPortion.Render("No matching dates."))
 	}
 	m.detail.GotoTop()
+}
+
+// dateRowAtPoint mirrors logModel.dateRowAtPoint — returns the absolute
+// list index at the given terminal coordinate, or false if the point is
+// not on a list row.
+func (m nutriModel) dateRowAtPoint(x, y int) (int, bool) {
+	listWidth := m.width / 3
+	if x < 0 || x >= listWidth {
+		return 0, false
+	}
+	const headerRows = 2
+	const filterRows = 2
+	rowStride := defaultDelegateRowStride()
+	rowsTop := headerRows + filterRows
+	if y < rowsTop {
+		return 0, false
+	}
+	first := m.list.Paginator.Page * m.list.Paginator.PerPage
+	offset := (y - rowsTop) / rowStride
+	idx := first + offset
+	items := m.list.Items()
+	if idx < 0 || idx >= len(items) {
+		return 0, false
+	}
+	return idx, true
 }
 
 func (m *nutriModel) resize(width, height int) {
