@@ -47,7 +47,7 @@ func Execute() {
 }
 
 func init() {
-	rootCmd.Flags().StringVarP(&flagStart, "start", "s", "", "Start date (YYYY-MM-DD, default: last 7 days)")
+	rootCmd.Flags().StringVarP(&flagStart, "start", "s", "", "Start date (YYYY-MM-DD, default: last 7 days; WW retains ~90 days)")
 	rootCmd.Flags().StringVarP(&flagEnd, "end", "e", "", "End date (YYYY-MM-DD, default: today)")
 	rootCmd.Flags().BoolVar(&flagJSON, "json", false, "Emit log as JSON to stdout")
 	rootCmd.Flags().BoolVarP(&flagReport, "report", "r", false, "Emit insights report to stdout")

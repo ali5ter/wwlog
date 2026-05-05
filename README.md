@@ -85,6 +85,23 @@ wwlog --start 2026-04-20 --end 2026-04-26 --export json --output ~/Downloads/
 wwlog --logout
 ```
 
+## Data window
+
+The WW `my-day` endpoint enforces a hard ~90-day backwards retention window — any date more
+than 89 days before today returns HTTP 400, regardless of how long you've held your WW account.
+This is a server-side policy, not a wwlog limitation.
+
+If `--start` is older than the window, wwlog clamps it forward and prints a one-line notice:
+
+```bash
+$ wwlog --start 2024-01-01 --end 2026-05-05 --report
+note: --start clamped to 2026-02-05 (WW retains ~90 days)
+```
+
+If `--end` is also older than the window, wwlog errors out before making any API calls. There's
+no workaround — long-running history exports aren't possible with this API. Plan ahead if you
+want to keep more than ~3 months of records: pull `--export json` regularly and archive the files.
+
 ## JSON pipeline examples
 
 The `--json` flag outputs a JSON array of day logs. Each element contains the date, meals
