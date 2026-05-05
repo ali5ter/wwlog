@@ -344,10 +344,10 @@ func renderHeatmap(logs []*api.DayLog, vw int) string {
 		styleFoodPortion.Render(string(hdr)))
 
 	// Day rows Mon→Sun, only Mon/Wed/Fri labelled (GitHub convention).
-	// Inter-cell gap rendered as a middle dot in the no-data colour so the
-	// boundary between adjacent cells stays visible even when neighbours
-	// share a colour (e.g. two no-data cells in a row).
-	gapStr := lipgloss.NewStyle().Foreground(colorLine).Render(strings.Repeat("·", gap))
+	// Plain-space gap between weeks — the half-height ▄ cells already
+	// provide a visible vertical gap (empty top half of each row), so a
+	// styled · separator on top read as visual noise.
+	gapStr := strings.Repeat(" ", gap)
 	dayNames := [7]string{"Mon", "", "Wed", "", "Fri", "", ""}
 	for row, name := range dayNames {
 		label := fmt.Sprintf("%-*s", dayLabelW, name)
