@@ -215,12 +215,13 @@ func writeMacroBar(b *strings.Builder, label string, pct, grams float64, unit st
 	fmt.Fprintf(b, "  %s%s  %s  %s\n", labelCol, pctCol, bar, gramCol)
 }
 
-// renderHeatmap draws a GitHub-style calendar grid coloured by daily points
-// vs target. Weeks run left→right, days Mon→Sun top→bottom.
+// renderHeatmap draws a GitHub-contributions-style calendar grid: months
+// labelled along the top, sparse weekday labels (Mon/Wed/Fri) down the left,
+// weeks as columns, days as rows, double-width cells for square-ish visuals,
+// quantised 4-step gradient.
 func renderHeatmap(logs []*api.DayLog, vw int) string {
 	const layout = "2006-01-02"
 
-	// Build per-date lookup: ratio of points used vs target.
 	type entry struct {
 		ratio     float64
 		hasTarget bool
@@ -240,108 +241,128 @@ func renderHeatmap(logs []*api.DayLog, vw int) string {
 	first, _ := time.Parse(layout, logs[0].Date)
 	last, _ := time.Parse(layout, logs[len(logs)-1].Date)
 
-	// Monday of the first week.
-	monOff := (int(first.Weekday()) + 6) % 7
-	gridStart := first.AddDate(0, 0, -monOff)
-
-	// Collect week start Mondays that overlap the range.
-	var weeks []time.Time
-	for d := gridStart; !d.After(last); d = d.AddDate(0, 0, 7) {
-		weeks = append(weeks, d)
-	}
-	nWeeks := len(weeks)
-	if nWeeks == 0 {
+	// Render only the queried [first..last] weeks. The WW my-day endpoint
+	// returns 400 for dates outside a member's tracked window, so a fixed
+	// "year-at-a-glance" canvas would be mostly grey forever — better to
+	// stay honest about what was fetched.
+	gridStart := first.AddDate(0, 0, -((int(first.Weekday())+6)%7))
+	endMon := last.AddDate(0, 0, -((int(last.Weekday())+6)%7))
+	nWeeks := int(endMon.Sub(gridStart).Hours()/(24*7)) + 1
+	if nWeeks <= 0 {
 		return ""
 	}
 
-	// Compute cell width so the grid fills vw naturally.
-	// Layout: "Mo  " (4) + nWeeks×cellW + (nWeeks-1)×gap
-	const gap = 2
-	const dayLabelW = 4
-	cellW := (vw - dayLabelW - gap*(nWeeks-1)) / nWeeks
-	if cellW < 2 {
-		cellW = 2
-	}
-	if cellW > 10 {
-		cellW = 10
+	var weeks []time.Time
+	for i := 0; i < nWeeks; i++ {
+		weeks = append(weeks, gridStart.AddDate(0, 0, 7*i))
 	}
 
-	// Cell colour: dark teal (nothing) → colorTeal (on budget) → colorPurple (over).
+	const dayLabelW = 4 // "Mon "
+	cellW := 2
+	gap := 1
+	totalW := dayLabelW + nWeeks*cellW + (nWeeks-1)*gap
+	if totalW > vw {
+		gap = 0
+		totalW = dayLabelW + nWeeks*cellW
+	}
+	if totalW > vw && cellW > 1 {
+		cellW = 1
+	}
+
+	// 5 discrete shades from "nothing logged" to "fully on budget", plus
+	// purple for over budget. Gives the GitHub-contributions stepped feel
+	// instead of a continuous gradient.
 	darkTeal := lipgloss.Color("#003d30")
-	cellStyle := func(dateStr string) string {
+	palette := [5]color.Color{
+		lerpColor(darkTeal, colorTeal, 0.10),
+		lerpColor(darkTeal, colorTeal, 0.35),
+		lerpColor(darkTeal, colorTeal, 0.60),
+		lerpColor(darkTeal, colorTeal, 0.85),
+		colorTeal,
+	}
+
+	noDataStyle := lipgloss.NewStyle().Foreground(colorLine)
+	cellFor := func(dateStr string) string {
 		blocks := strings.Repeat("█", cellW)
 		e, inRange := days[dateStr]
-		if !inRange {
-			return strings.Repeat(" ", cellW) // outside the date range: blank
-		}
-		if !e.hasTarget {
-			return lipgloss.NewStyle().Foreground(colorLine).Render(blocks)
+		if !inRange || !e.hasTarget {
+			return noDataStyle.Render(blocks)
 		}
 		var c color.Color
 		switch {
 		case e.ratio > 1.02:
 			c = colorPurple
 		case e.ratio >= 0.85:
-			c = colorTeal
+			c = palette[4]
+		case e.ratio >= 0.60:
+			c = palette[3]
+		case e.ratio >= 0.35:
+			c = palette[2]
+		case e.ratio >= 0.10:
+			c = palette[1]
 		default:
-			t := e.ratio / 0.85
-			if t < 0 {
-				t = 0
-			}
-			c = lerpColor(darkTeal, colorTeal, t)
+			c = palette[0]
 		}
 		return lipgloss.NewStyle().Foreground(c).Render(blocks)
 	}
 
 	var b strings.Builder
 
-	// Header row: week start date, styled to align with each column.
-	fmt.Fprintf(&b, "%s", strings.Repeat(" ", dayLabelW))
+	// Month label row: place each month's 3-letter abbreviation at the
+	// position of the first week starting in that month. Labels may
+	// overflow the (cellW+gap) slot they nominally occupy — that's fine
+	// because the slot to their right is blank until the next month.
+	// +3 trailing chars so a label on the rightmost week column has room to
+	// render its 3-letter month abbreviation without being truncated.
+	hdrLen := nWeeks*cellW + (nWeeks-1)*gap + 3
+	hdr := []rune(strings.Repeat(" ", hdrLen))
+	var lastMonth time.Month
 	for i, w := range weeks {
-		if i > 0 {
-			fmt.Fprintf(&b, "%s", strings.Repeat(" ", gap))
-		}
-		var label string
-		switch {
-		case cellW >= 6:
-			label = w.Format("Jan 2")
-		case cellW >= 4:
-			label = w.Format("1/2")
-		default:
-			// Show month initial only when the month changes.
-			if i == 0 || w.Month() != weeks[i-1].Month() {
-				label = w.Format("Jan")[:1]
-			} else {
-				label = " "
+		if w.Month() != lastMonth {
+			lastMonth = w.Month()
+			label := w.Format("Jan")
+			pos := i * (cellW + gap)
+			for j, r := range label {
+				if pos+j < len(hdr) {
+					hdr[pos+j] = r
+				}
 			}
 		}
-		fmt.Fprintf(&b, "%s", styleFoodPortion.Render(fmt.Sprintf("%-*s", cellW, label)))
 	}
-	fmt.Fprintln(&b)
+	fmt.Fprintf(&b, "%s%s\n",
+		strings.Repeat(" ", dayLabelW),
+		styleFoodPortion.Render(string(hdr)))
 
-	// Day rows Mon→Sun.
-	dayNames := [7]string{"Mo", "Tu", "We", "Th", "Fr", "Sa", "Su"}
+	// Day rows Mon→Sun, only Mon/Wed/Fri labelled (GitHub convention).
+	// Inter-cell gap rendered as a middle dot in the no-data colour so the
+	// boundary between adjacent cells stays visible even when neighbours
+	// share a colour (e.g. two no-data cells in a row).
+	gapStr := lipgloss.NewStyle().Foreground(colorLine).Render(strings.Repeat("·", gap))
+	dayNames := [7]string{"Mon", "", "Wed", "", "Fri", "", ""}
 	for row, name := range dayNames {
-		fmt.Fprintf(&b, "%s  ", styleDetailLabel.Render(name))
+		label := fmt.Sprintf("%-*s", dayLabelW, name)
+		fmt.Fprintf(&b, "%s", styleDetailLabel.Render(label))
 		for i, weekMon := range weeks {
-			if i > 0 {
-				fmt.Fprintf(&b, "%s", strings.Repeat(" ", gap))
+			if i > 0 && gap > 0 {
+				fmt.Fprintf(&b, "%s", gapStr)
 			}
 			date := weekMon.AddDate(0, 0, row)
-			fmt.Fprintf(&b, "%s", cellStyle(date.Format(layout)))
+			fmt.Fprintf(&b, "%s", cellFor(date.Format(layout)))
 		}
 		fmt.Fprintln(&b)
 	}
 
-	// Legend.
+	// Legend: GitHub-style "Less □ ▓ ▒ ▓ ▓ More" + over-budget caveat.
 	fmt.Fprintln(&b)
-	none := lipgloss.NewStyle().Foreground(colorLine).Render("██")
-	low := lipgloss.NewStyle().Foreground(lerpColor(darkTeal, colorTeal, 0.3)).Render("██")
-	mid := lipgloss.NewStyle().Foreground(lerpColor(darkTeal, colorTeal, 0.6)).Render("██")
-	full := lipgloss.NewStyle().Foreground(colorTeal).Render("██")
-	over := lipgloss.NewStyle().Foreground(colorPurple).Render("██")
-	fmt.Fprintf(&b, "  %s no log  %s %s %s on budget  %s over budget",
-		none, low, mid, full, over)
+	swatch := func(c color.Color) string {
+		return lipgloss.NewStyle().Foreground(c).Render(strings.Repeat("█", cellW))
+	}
+	fmt.Fprintf(&b, "%sLess %s %s %s %s %s More  %s over budget  %s no data",
+		strings.Repeat(" ", dayLabelW),
+		swatch(palette[0]), swatch(palette[1]), swatch(palette[2]),
+		swatch(palette[3]), swatch(palette[4]),
+		swatch(colorPurple),
+		swatch(colorLine))
 
 	return b.String()
 }

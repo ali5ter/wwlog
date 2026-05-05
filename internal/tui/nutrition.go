@@ -475,7 +475,7 @@ func makeBar(value, max float64, width int) string {
 	}
 
 	fillStyle := lipgloss.NewStyle().Foreground(barColor)
-	emptyStyle := lipgloss.NewStyle().Foreground(colorSteel)
+	emptyStyle := lipgloss.NewStyle().Foreground(colorLine)
 
 	var b strings.Builder
 	if full > 0 {
@@ -487,7 +487,7 @@ func makeBar(value, max float64, width int) string {
 		emptyCells--
 	}
 	if emptyCells > 0 {
-		b.WriteString(emptyStyle.Render(strings.Repeat("░", emptyCells)))
+		b.WriteString(emptyStyle.Render(strings.Repeat("█", emptyCells)))
 	}
 	return b.String()
 }
