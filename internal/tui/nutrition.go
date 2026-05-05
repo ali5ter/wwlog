@@ -448,24 +448,48 @@ func clampOutliers(vals []float64) []float64 {
 	return result
 }
 
+// subcellBlocks indexes Unicode partial-block runes by eighths of a cell:
+// 0 → empty, 1 → ▏ (1/8), 2 → ▎ (2/8), …, 8 → █ (8/8). The boundary cell of a
+// bar uses one of these to show fractional fill at ~8× horizontal precision
+// of a single full block.
+var subcellBlocks = [9]rune{' ', '▏', '▎', '▍', '▌', '▋', '▊', '▉', '█'}
+
 func makeBar(value, max float64, width int) string {
 	if width == 0 {
 		return ""
 	}
-	filled := 0
+	eighths := 0
 	if max > 0 {
-		filled = int(math.Round(value / max * float64(width)))
+		eighths = int(math.Round(value / max * float64(width) * 8))
 	}
-	if filled > width {
-		filled = width
+	maxEighths := width * 8
+	if eighths > maxEighths {
+		eighths = maxEighths
 	}
-	empty := width - filled
+	full := eighths / 8
+	rem := eighths % 8
+
 	barColor := color.Color(colorTeal)
 	if max > 0 && value > max {
 		barColor = colorPurple
 	}
-	return lipgloss.NewStyle().Foreground(barColor).Render(strings.Repeat("█", filled)) +
-		lipgloss.NewStyle().Foreground(colorSteel).Render(strings.Repeat("░", empty))
+
+	fillStyle := lipgloss.NewStyle().Foreground(barColor)
+	emptyStyle := lipgloss.NewStyle().Foreground(colorSteel)
+
+	var b strings.Builder
+	if full > 0 {
+		b.WriteString(fillStyle.Render(strings.Repeat("█", full)))
+	}
+	emptyCells := width - full
+	if rem > 0 && emptyCells > 0 {
+		b.WriteString(fillStyle.Render(string(subcellBlocks[rem])))
+		emptyCells--
+	}
+	if emptyCells > 0 {
+		b.WriteString(emptyStyle.Render(strings.Repeat("░", emptyCells)))
+	}
+	return b.String()
 }
 
 func formatNutriValue(v float64) string {
