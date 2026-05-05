@@ -241,14 +241,15 @@ func renderHeatmap(logs []*api.DayLog, vw int) string {
 		}
 	}
 
-	// Fixed grid: span the WW my-day endpoint's ~89-day backwards window so
-	// the heatmap is the same width regardless of the queried range.
-	// Anchored to the Monday of the current week on the right; cells outside
-	// the queried [first..last] window render as no-data grey.
-	today := time.Now().UTC().Truncate(24 * time.Hour)
+	// Fixed grid: span the WW my-day endpoint's retention window so the
+	// heatmap is the same width regardless of the queried range. Anchored
+	// to the Monday of the current week on the right; cells outside the
+	// queried [first..last] window render as no-data grey. Uses the local
+	// calendar date — matches api.ClampToWindow's boundary logic.
+	today, _ := time.Parse(layout, time.Now().Format(layout))
 	todayStr := today.Format(layout)
 	todayMon := today.AddDate(0, 0, -((int(today.Weekday())+6)%7))
-	earliestMon := today.AddDate(0, 0, -89)
+	earliestMon := today.AddDate(0, 0, -api.APIWindowDays)
 	earliestMon = earliestMon.AddDate(0, 0, -((int(earliestMon.Weekday())+6)%7))
 	nWeeks := int(todayMon.Sub(earliestMon).Hours()/(24*7)) + 1
 
