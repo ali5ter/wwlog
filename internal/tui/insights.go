@@ -23,6 +23,7 @@ type insightsModel struct {
 
 func newInsightsModel(logs []*api.DayLog, width, height int) insightsModel {
 	vp := viewport.New(viewport.WithWidth(width-2), viewport.WithHeight(height))
+	vp.MouseWheelEnabled = true
 	m := insightsModel{
 		viewport:    vp,
 		logs:        logs,

@@ -73,7 +73,7 @@ func newExportModel(width, height int) exportModel {
 				Value(&dir).
 				Validate(validateDir),
 		),
-	).WithTheme(wwHuhTheme{}).WithWidth(w).WithShowHelp(true)
+	).WithTheme(wwHuhTheme{}).WithWidth(w).WithShowHelp(false)
 
 	return exportModel{form: form, width: width, height: height}
 }
