@@ -475,7 +475,7 @@ func makeBar(value, max float64, width int) string {
 	}
 
 	fillStyle := lipgloss.NewStyle().Foreground(barColor)
-	markerStyle := lipgloss.NewStyle().Foreground(colorMuted)
+	markerStyle := lipgloss.NewStyle().Foreground(colorLine)
 
 	var b strings.Builder
 	if full > 0 {
