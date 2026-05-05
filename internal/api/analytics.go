@@ -170,10 +170,11 @@ func ComputeRangeSummary(logs []*DayLog) RangeSummary {
 	var totalPts, totalTarget, totalCals float64
 	for _, day := range logs {
 		p := day.Points
-		totalPts += p.DailyUsed
+		consumed := day.TotalPointsConsumed()
+		totalPts += consumed
 		totalTarget += p.DailyTarget
 		if p.DailyTarget > 0 {
-			if p.DailyUsed <= p.DailyTarget {
+			if consumed <= p.DailyTarget {
 				s.DaysUnderBudget++
 			} else {
 				s.DaysOverBudget++

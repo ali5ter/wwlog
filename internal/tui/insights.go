@@ -229,8 +229,11 @@ func renderHeatmap(logs []*api.DayLog, vw int) string {
 	days := make(map[string]entry, len(logs))
 	for _, log := range logs {
 		if log.Points.DailyTarget > 0 {
+			// Use TotalPointsConsumed (sum of food entries' PointsPrecise)
+			// rather than Points.DailyUsed — the latter caps at DailyTarget,
+			// hiding over-budget days that flowed into the weekly allowance.
 			days[log.Date] = entry{
-				ratio:     log.Points.DailyUsed / log.Points.DailyTarget,
+				ratio:     log.TotalPointsConsumed() / log.Points.DailyTarget,
 				hasTarget: true,
 			}
 		} else {

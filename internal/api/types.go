@@ -126,6 +126,19 @@ func (d *DayLog) AllEntries() []FoodEntry {
 	return entries
 }
 
+// TotalPointsConsumed sums PointsPrecise across all food entries, giving the
+// true points spent that day regardless of how WW splits consumption between
+// the daily target and the weekly allowance bucket. Points.DailyUsed from
+// the API caps at DailyTarget — overflow flows silently into
+// Points.WeeklyAllowanceUsed — so DailyUsed alone hides over-budget days.
+func (d *DayLog) TotalPointsConsumed() float64 {
+	var total float64
+	for _, e := range d.AllEntries() {
+		total += e.PointsPrecise
+	}
+	return total
+}
+
 // DayNutrition holds aggregated nutritional totals for a single day.
 type DayNutrition struct {
 	Date         string
