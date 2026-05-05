@@ -241,12 +241,9 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			var cmd tea.Cmd
 			m.exportModel, cmd = m.exportModel.update(msg)
 			if m.exportModel.form.State == huh.StateCompleted {
-				m.dialog = dialogNone
-				if !m.exportModel.form.GetBool("confirmed") {
-					return m, nil
-				}
 				format := m.exportModel.form.GetString("format")
 				dir := m.exportModel.form.GetString("dir")
+				m.dialog = dialogNone
 				m.statusMsg = styleFoodPortion.Render("  Saving…")
 				return m, runExport(format, dir, m.start, m.end, m.logs)
 			}
@@ -267,12 +264,9 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			var cmd tea.Cmd
 			m.dateRangeModel, cmd = m.dateRangeModel.update(msg)
 			if m.dateRangeModel.form.State == huh.StateCompleted {
-				m.dialog = dialogNone
-				if !m.dateRangeModel.form.GetBool("confirmed") {
-					return m, nil
-				}
 				m.start = m.dateRangeModel.form.GetString("start")
 				m.end = m.dateRangeModel.form.GetString("end")
+				m.dialog = dialogNone
 				m.loading = true
 				authObj := m.authObj
 				tld := m.tld
@@ -333,12 +327,9 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		m.exportModel, cmd = m.exportModel.update(msg)
 		// huh may complete via an internal message rather than a KeyMsg.
 		if m.exportModel.form.State == huh.StateCompleted {
-			m.dialog = dialogNone
-			if !m.exportModel.form.GetBool("confirmed") {
-				return m, nil
-			}
 			format := m.exportModel.form.GetString("format")
 			dir := m.exportModel.form.GetString("dir")
+			m.dialog = dialogNone
 			m.statusMsg = styleFoodPortion.Render("  Saving…")
 			return m, runExport(format, dir, m.start, m.end, m.logs)
 		}
@@ -349,12 +340,9 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		m.dateRangeModel, cmd = m.dateRangeModel.update(msg)
 		// huh may complete via an internal message rather than a KeyMsg.
 		if m.dateRangeModel.form.State == huh.StateCompleted {
-			m.dialog = dialogNone
-			if !m.dateRangeModel.form.GetBool("confirmed") {
-				return m, nil
-			}
 			m.start = m.dateRangeModel.form.GetString("start")
 			m.end = m.dateRangeModel.form.GetString("end")
+			m.dialog = dialogNone
 			m.loading = true
 			authObj := m.authObj
 			tld := m.tld

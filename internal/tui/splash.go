@@ -274,7 +274,6 @@ func newDateRangeModel(start, end string, width, height int) dateRangeModel {
 		huh.NewGroup(
 			huh.NewInput().Key("start").Title("From").Placeholder("YYYY-MM-DD").Value(&s).Validate(validateDate),
 			huh.NewInput().Key("end").Title("To").Placeholder("YYYY-MM-DD").Value(&e).Validate(validateDate),
-			huh.NewConfirm().Key("confirmed").Affirmative("Submit").Negative("Cancel"),
 		),
 	).WithTheme(wwHuhTheme{}).WithWidth(w).WithShowHelp(false)
 	return dateRangeModel{form: form, width: width, height: height}
@@ -321,10 +320,10 @@ func (wwHuhTheme) Theme(isDark bool) *huh.Styles {
 	t.Focused.NextIndicator = lipgloss.NewStyle().Foreground(teal).SetString("→")
 	t.Focused.FocusedButton = lipgloss.NewStyle().
 		Foreground(panel).Background(teal).Bold(true).
-		Padding(0, 4).MarginRight(1).MarginTop(1)
+		Padding(0, 3).MarginRight(1)
 	t.Focused.BlurredButton = lipgloss.NewStyle().
-		Foreground(steel).Background(colorLine).
-		Padding(0, 4).MarginRight(1).MarginTop(1)
+		Foreground(muted).Background(panel).
+		Padding(0, 3).MarginRight(1)
 	t.Focused.TextInput.Cursor = lipgloss.NewStyle().Foreground(teal)
 	t.Focused.TextInput.CursorText = lipgloss.NewStyle().Foreground(panel).Background(teal)
 	t.Focused.TextInput.Placeholder = lipgloss.NewStyle().Foreground(muted)
