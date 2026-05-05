@@ -320,10 +320,10 @@ func (wwHuhTheme) Theme(isDark bool) *huh.Styles {
 	t.Focused.NextIndicator = lipgloss.NewStyle().Foreground(teal).SetString("→")
 	t.Focused.FocusedButton = lipgloss.NewStyle().
 		Foreground(panel).Background(teal).Bold(true).
-		Padding(0, 3).MarginRight(1)
+		Padding(0, 4).MarginRight(1).MarginTop(1)
 	t.Focused.BlurredButton = lipgloss.NewStyle().
-		Foreground(muted).Background(panel).
-		Padding(0, 3).MarginRight(1)
+		Foreground(steel).Background(colorLine).
+		Padding(0, 4).MarginRight(1).MarginTop(1)
 	t.Focused.TextInput.Cursor = lipgloss.NewStyle().Foreground(teal)
 	t.Focused.TextInput.CursorText = lipgloss.NewStyle().Foreground(panel).Background(teal)
 	t.Focused.TextInput.Placeholder = lipgloss.NewStyle().Foreground(muted)
