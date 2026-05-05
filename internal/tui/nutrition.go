@@ -14,6 +14,7 @@ import (
 	tea "charm.land/bubbletea/v2"
 	"charm.land/lipgloss/v2"
 	"github.com/NimbleMarkets/ntcharts/v2/canvas"
+	"github.com/NimbleMarkets/ntcharts/v2/canvas/runes"
 	"github.com/NimbleMarkets/ntcharts/v2/linechart"
 	"github.com/ali5ter/wwlog/internal/api"
 )
@@ -405,9 +406,10 @@ func writeTrendTable(b *strings.Builder, logs []*api.DayLog, data map[string]*ap
 		)
 		lc.DrawXYAxisAndLabel()
 		for i := 1; i < n; i++ {
-			lc.DrawBrailleLineWithStyle(
+			lc.DrawLineWithStyle(
 				canvas.Float64Point{X: float64(i - 1), Y: vals[i-1]},
 				canvas.Float64Point{X: float64(i), Y: vals[i]},
+				runes.ArcLineStyle,
 				lineStyle,
 			)
 		}
