@@ -1,8 +1,21 @@
 #!/usr/bin/env bash
-
-# @file run_vhs.sh
-# @brief Generate git animations using vhs
-# @ref https://github.com/charmbracelet/vhs
+#
+# @name run_vhs.sh
+# @brief Generate demo animations using vhs
+# @author Alister Lewis-Bowen <alister@lewis-bowen.org>
+# @version 0.1.0
+# @date 2026-05-06
+# @license MIT
+#
+# @usage run_vhs.sh [tape]
+#   tape  Path to a .tape file, or omit to process all *.tape files in the current directory
+#
+# @dependencies
+#   vhs  https://github.com/charmbracelet/vhs
+#
+# @exit_codes
+#   0  Success
+#   1  vhs not installed
 
 tape=${1:-"all"}
 
