@@ -11,9 +11,10 @@ import (
 
 // Config holds user-configurable settings.
 type Config struct {
-	TLD      string `mapstructure:"tld"`
-	Theme    string `mapstructure:"theme"`
-	CacheTTL int    `mapstructure:"cache_ttl"`
+	TLD        string `mapstructure:"tld"`
+	Theme      string `mapstructure:"theme"`
+	CacheTTL   int    `mapstructure:"cache_ttl"`
+	WeightUnit string `mapstructure:"weight_unit"`
 }
 
 // Load reads ~/.config/wwlog/config.toml, applying defaults where absent.

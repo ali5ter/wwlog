@@ -149,6 +149,7 @@ type DayNutrition struct {
 	Carbs        float64
 	Fiber        float64
 	Sugar        float64
+	AddedSugar   float64
 	Protein      float64
 	Alcohol      float64
 	ItemCount    int
@@ -201,6 +202,7 @@ func ComputeAllNutrition(logs []*DayLog) map[string]*DayNutrition {
 			dn.Carbs += n.Carbs
 			dn.Fiber += n.Fiber
 			dn.Sugar += n.Sugar
+			dn.AddedSugar += n.AddedSugar
 			dn.Protein += n.Protein
 			dn.Alcohol += n.Alcohol
 			dn.ItemCount++

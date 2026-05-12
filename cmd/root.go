@@ -207,7 +207,7 @@ func run(cmd *cobra.Command, _ []string) error {
 	}
 
 	// TUI mode: auth and date range handled inside the TUI.
-	return tui.Run(authenticator, tld, flagStart, flagEnd, version)
+	return tui.Run(authenticator, tld, cfg.WeightUnit, flagStart, flagEnd, version)
 }
 
 func readPassword() (string, error) {

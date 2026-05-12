@@ -212,7 +212,8 @@ wwlog --start 2026-04-20 --end 2026-04-26 --json \
 Optional config at `~/.config/wwlog/config.toml`:
 
 ```toml
-tld       = "com"   # WW top-level domain
+tld         = "com"   # WW top-level domain
+weight_unit = "lb"    # override weight unit: "lb" or "kg" (default: from API)
 ```
 
 ## Credits

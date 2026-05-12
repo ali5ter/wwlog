@@ -4,10 +4,13 @@ import "time"
 
 // locale encapsulates TLD-derived display preferences for dates and units.
 type locale struct {
-	tld string
+	tld                string
+	weightUnitOverride string
 }
 
-func newLocale(tld string) locale { return locale{tld: tld} }
+func newLocale(tld, weightUnitOverride string) locale {
+	return locale{tld: tld, weightUnitOverride: weightUnitOverride}
+}
 
 func (l locale) isUS() bool { return l.tld == "com" }
 
@@ -37,9 +40,11 @@ func (l locale) dateLong(date string) string {
 	return t.Format("Monday 2 January 2006")
 }
 
-// weightUnit returns the unit string from the API response, falling back to
-// a TLD-derived default if the API returns an empty value.
+// weightUnit returns the unit to display, respecting any config override.
 func (l locale) weightUnit(fromAPI string) string {
+	if l.weightUnitOverride != "" {
+		return l.weightUnitOverride
+	}
 	if fromAPI != "" {
 		return fromAPI
 	}
@@ -47,4 +52,19 @@ func (l locale) weightUnit(fromAPI string) string {
 		return "lb"
 	}
 	return "kg"
+}
+
+// displayWeight returns the value and unit for display, converting the
+// API-reported value when a weight_unit config override differs from it.
+func (l locale) displayWeight(value float64, apiUnit string) (float64, string) {
+	unit := l.weightUnit(apiUnit)
+	if apiUnit != "" && unit != apiUnit {
+		switch {
+		case apiUnit == "kg" && unit == "lb":
+			return value * 2.20462, unit
+		case apiUnit == "lb" && unit == "kg":
+			return value / 2.20462, unit
+		}
+	}
+	return value, unit
 }

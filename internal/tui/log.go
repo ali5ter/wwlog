@@ -306,7 +306,8 @@ func renderPointsSummary(b *strings.Builder, pts api.DayPoints, contentWidth int
 		meta = append(meta, fmt.Sprintf("Activity +%.0f earned", pts.ActivityEarned))
 	}
 	if pts.Weight > 0 {
-		meta = append(meta, fmt.Sprintf("Weight %.1f %s", pts.Weight, loc.weightUnit(pts.WeightUnit)))
+		w, unit := loc.displayWeight(pts.Weight, pts.WeightUnit)
+		meta = append(meta, fmt.Sprintf("Weight %.1f %s", w, unit))
 	}
 	if len(meta) > 0 {
 		fmt.Fprintf(b, "  %s\n", styleFoodPortion.Render(strings.Join(meta, "  ·  ")))
@@ -395,7 +396,8 @@ func mealSummary(day *api.DayLog, loc locale) string {
 	}
 	s := fmt.Sprintf("%.0fpt / %.0fpt", pts.DailyUsed, pts.DailyTarget)
 	if pts.Weight > 0 {
-		s += fmt.Sprintf("  ·  %.1f %s", pts.Weight, loc.weightUnit(pts.WeightUnit))
+		w, unit := loc.displayWeight(pts.Weight, pts.WeightUnit)
+		s += fmt.Sprintf("  ·  %.1f %s", w, unit)
 	}
 	return s
 }

@@ -167,6 +167,33 @@ func (m *insightsModel) render() string {
 		fmt.Fprintf(&b, "\n  %s\n", styleFoodPortion.Render("Recommended: ~20% protein  ·  ~50% carbs  ·  ~30% fat"))
 	}
 
+	// ── Micronutrients ─────────────────────────────────────────────
+	nutrition := api.ComputeAllNutrition(m.logs)
+	var fiberSum, sodiumSum, addedSugarSum float64
+	daysWithData := 0
+	for _, dn := range nutrition {
+		if dn.ItemCount > 0 {
+			fiberSum += dn.Fiber
+			sodiumSum += dn.Sodium
+			addedSugarSum += dn.AddedSugar
+			daysWithData++
+		}
+	}
+	if daysWithData > 0 {
+		n := float64(daysWithData)
+		fmt.Fprintf(&b, "\n%s\n%s\n\n", styleMealHeading.Render("Daily Averages  (fiber · sodium · added sugar)"), sep)
+		writeMicroBar := func(label, unit string, avg, ref float64) {
+			bar := makeBar(avg, ref, barWidth)
+			labelCol := lipgloss.NewStyle().Width(13).Render(styleDetailLabel.Render(label))
+			valCol := lipgloss.NewStyle().Width(12).Render(styleDetailValue.Render(fmt.Sprintf("%s %s", formatNutriValue(avg), unit)))
+			refStr := styleFoodPortion.Render(fmt.Sprintf("ref %s", formatNutriValue(ref)))
+			fmt.Fprintf(&b, "  %s%s%s  %s\n", labelCol, valCol, bar, refStr)
+		}
+		writeMicroBar("Fiber", "g", fiberSum/n, rdv.Fiber)
+		writeMicroBar("Sodium", "mg", sodiumSum/n, rdv.Sodium)
+		writeMicroBar("Added Sugar", "g", addedSugarSum/n, rdv.AddedSugar)
+	}
+
 	// ── Top Foods by Points ─────────────────────────────────────────
 	fmt.Fprintf(&b, "\n%s\n%s\n\n", styleMealHeading.Render("Top Foods by Points"), sep)
 

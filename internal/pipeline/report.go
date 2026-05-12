@@ -65,6 +65,32 @@ func EmitTextReport(w io.Writer, logs []*api.DayLog) error {
 		}
 	}
 
+	// Daily averages — fiber, sodium, added sugar
+	nutrition := api.ComputeAllNutrition(logs)
+	var fiberSum, sodiumSum, addedSugarSum float64
+	daysWithData := 0
+	for _, dn := range nutrition {
+		if dn.ItemCount > 0 {
+			fiberSum += dn.Fiber
+			sodiumSum += dn.Sodium
+			addedSugarSum += dn.AddedSugar
+			daysWithData++
+		}
+	}
+	if daysWithData > 0 {
+		n := float64(daysWithData)
+		fmtMicro := func(v float64) string {
+			if v == 0 {
+				return "—"
+			}
+			return fmt.Sprintf("%.0f", v)
+		}
+		fmt.Fprintf(w, "\nDAILY AVERAGES (additional)\n")
+		fmt.Fprintf(w, "  %-14s  %s g avg   (ref ≥%.0fg)\n", "Fiber", fmtMicro(fiberSum/n), 28.0)
+		fmt.Fprintf(w, "  %-14s  %s mg avg  (ref ≤%.0fmg)\n", "Sodium", fmtMicro(sodiumSum/n), 2300.0)
+		fmt.Fprintf(w, "  %-14s  %s g avg   (ref ≤%.0fg)\n", "Added Sugar", fmtMicro(addedSugarSum/n), 35.0)
+	}
+
 	// Top foods by points
 	foods := api.TopFoods(logs, 20)
 	fmt.Fprintf(w, "\nTOP FOODS BY POINTS\n")

@@ -28,6 +28,7 @@ var rdv = &api.DayNutrition{
 	Carbs:        300,
 	Fiber:        28,
 	Sugar:        50,
+	AddedSugar:   35,
 	Protein:      50,
 	Alcohol:      28,
 }
@@ -301,6 +302,9 @@ func (m *nutriModel) renderDetail() string {
 	writeNutriBar(&b, "Fiber", "g", dn.Fiber, rdv.Fiber, m.avgs.Fiber, barWidth)
 	writeNutriBar(&b, "Sodium", "mg", dn.Sodium, rdv.Sodium, m.avgs.Sodium, barWidth)
 	writeNutriBar(&b, "Sugar", "g", dn.Sugar, rdv.Sugar, m.avgs.Sugar, barWidth)
+	if dn.AddedSugar > 0 || m.avgs.AddedSugar > 0 {
+		writeNutriBar(&b, "Added Sugar", "g", dn.AddedSugar, rdv.AddedSugar, m.avgs.AddedSugar, barWidth)
+	}
 	if dn.Alcohol > 0 || m.avgs.Alcohol > 0 {
 		writeNutriBar(&b, "Alcohol", "g", dn.Alcohol, rdv.Alcohol, m.avgs.Alcohol, barWidth)
 	}
@@ -337,12 +341,13 @@ func writeTrendTable(b *strings.Builder, logs []*api.DayLog, data map[string]*ap
 		label string
 		unit  string
 		get   func(*api.DayNutrition) float64
+		ref   float64 // reference daily value drawn as a threshold line
 	}
 	metrics := []series{
-		{"Calories", "kcal", func(d *api.DayNutrition) float64 { return d.Calories }},
-		{"Protein", "g", func(d *api.DayNutrition) float64 { return d.Protein }},
-		{"Carbs", "g", func(d *api.DayNutrition) float64 { return d.Carbs }},
-		{"Fat", "g", func(d *api.DayNutrition) float64 { return d.Fat }},
+		{"Calories", "kcal", func(d *api.DayNutrition) float64 { return d.Calories }, rdv.Calories},
+		{"Protein", "g", func(d *api.DayNutrition) float64 { return d.Protein }, rdv.Protein},
+		{"Carbs", "g", func(d *api.DayNutrition) float64 { return d.Carbs }, rdv.Carbs},
+		{"Fat", "g", func(d *api.DayNutrition) float64 { return d.Fat }, rdv.Fat},
 	}
 
 	n := len(logs)
@@ -386,7 +391,8 @@ func writeTrendTable(b *strings.Builder, logs []*api.DayLog, data map[string]*ap
 		}
 		vals = clampOutliers(vals)
 
-		maxY := 0.0
+		// Ensure Y range always includes the reference threshold so it is visible.
+		maxY := m.ref
 		for _, v := range vals {
 			if v > maxY {
 				maxY = v
@@ -405,6 +411,16 @@ func writeTrendTable(b *strings.Builder, logs []*api.DayLog, data map[string]*ap
 			linechart.WithXLabelFormatter(dateLabel),
 		)
 		lc.DrawXYAxisAndLabel()
+		// Draw reference threshold line before data so data renders on top.
+		if m.ref > 0 {
+			refStyle := lipgloss.NewStyle().Foreground(colorMuted)
+			lc.DrawLineWithStyle(
+				canvas.Float64Point{X: 0, Y: m.ref},
+				canvas.Float64Point{X: float64(n - 1), Y: m.ref},
+				runes.ArcLineStyle,
+				refStyle,
+			)
+		}
 		for i := 1; i < n; i++ {
 			lc.DrawLineWithStyle(
 				canvas.Float64Point{X: float64(i - 1), Y: vals[i-1]},
@@ -414,7 +430,7 @@ func writeTrendTable(b *strings.Builder, logs []*api.DayLog, data map[string]*ap
 			)
 		}
 
-		caption := fmt.Sprintf("%s (%s)", m.label, m.unit)
+		caption := fmt.Sprintf("%s (%s)  ref: %.0f", m.label, m.unit, m.ref)
 		fmt.Fprintf(b, "%s\n%s\n\n", styleDetailLabel.Render(caption), lc.View())
 	}
 }
@@ -510,7 +526,7 @@ func formatNutriValue(v float64) string {
 
 func computeAverages(data map[string]*api.DayNutrition, logs []*api.DayLog) *api.DayNutrition {
 	type fields struct {
-		cals, fat, satFat, sodium, carbs, fiber, sugar, protein, alcohol []float64
+		cals, fat, satFat, sodium, carbs, fiber, sugar, addedSugar, protein, alcohol []float64
 	}
 	var f fields
 	for _, day := range logs {
@@ -525,6 +541,7 @@ func computeAverages(data map[string]*api.DayNutrition, logs []*api.DayLog) *api
 		f.carbs = append(f.carbs, dn.Carbs)
 		f.fiber = append(f.fiber, dn.Fiber)
 		f.sugar = append(f.sugar, dn.Sugar)
+		f.addedSugar = append(f.addedSugar, dn.AddedSugar)
 		f.protein = append(f.protein, dn.Protein)
 		f.alcohol = append(f.alcohol, dn.Alcohol)
 	}
@@ -547,6 +564,7 @@ func computeAverages(data map[string]*api.DayNutrition, logs []*api.DayLog) *api
 		Carbs:        meanOf(f.carbs),
 		Fiber:        meanOf(f.fiber),
 		Sugar:        meanOf(f.sugar),
+		AddedSugar:   meanOf(f.addedSugar),
 		Protein:      meanOf(f.protein),
 		Alcohol:      meanOf(f.alcohol),
 	}

@@ -25,7 +25,7 @@ func WriteJSON(w io.Writer, logs []*api.DayLog) error {
 // WriteLogCSV writes a CSV of food log entries with points and calories to w.
 func WriteLogCSV(w io.Writer, logs []*api.DayLog) error {
 	cw := csv.NewWriter(w)
-	_ = cw.Write([]string{"Date", "Meal", "Food", "Serving", "Points", "Calories", "Protein (g)", "Carbs (g)", "Fat (g)"})
+	_ = cw.Write([]string{"Date", "Meal", "Food", "Serving", "Points", "Calories", "Protein (g)", "Carbs (g)", "Fat (g)", "Fiber (g)", "Sodium (mg)", "Added Sugar (g)"})
 	for _, day := range logs {
 		for meal, entries := range map[string][]api.FoodEntry{
 			"Breakfast": day.Meals.Morning,
@@ -46,6 +46,9 @@ func WriteLogCSV(w io.Writer, logs []*api.DayLog) error {
 					fmt.Sprintf("%.1f", n.Protein),
 					fmt.Sprintf("%.1f", n.Carbs),
 					fmt.Sprintf("%.1f", n.Fat),
+					fmt.Sprintf("%.1f", n.Fiber),
+					fmt.Sprintf("%.1f", n.Sodium),
+					fmt.Sprintf("%.1f", n.AddedSugar),
 				})
 			}
 		}
@@ -56,6 +59,7 @@ func WriteLogCSV(w io.Writer, logs []*api.DayLog) error {
 
 // EmitMarkdown writes a Markdown food log report to w.
 func EmitMarkdown(w io.Writer, logs []*api.DayLog) error {
+	nutrition := api.ComputeAllNutrition(logs)
 	fmt.Fprintf(w, "# Food Log\n\n")
 	for _, day := range logs {
 		fmt.Fprintf(w, "## %s\n\n", day.Date)
@@ -63,6 +67,20 @@ func EmitMarkdown(w io.Writer, logs []*api.DayLog) error {
 		if p.DailyTarget > 0 {
 			fmt.Fprintf(w, "**Points:** %.0f / %.0f used  ·  Weekly bank: %.0f\n\n",
 				p.DailyUsed, p.DailyTarget, p.WeeklyAllowanceRemaining)
+		}
+		if dn, ok := nutrition[day.Date]; ok && dn.ItemCount > 0 {
+			fmt.Fprintf(w, "**Nutrition:** %.0f kcal  ·  protein %.0fg  ·  carbs %.0fg  ·  fat %.0fg",
+				dn.Calories, dn.Protein, dn.Carbs, dn.Fat)
+			if dn.Fiber > 0 {
+				fmt.Fprintf(w, "  ·  fiber %.0fg", dn.Fiber)
+			}
+			if dn.Sodium > 0 {
+				fmt.Fprintf(w, "  ·  sodium %.0fmg", dn.Sodium)
+			}
+			if dn.AddedSugar > 0 {
+				fmt.Fprintf(w, "  ·  added sugar %.0fg", dn.AddedSugar)
+			}
+			fmt.Fprintf(w, "\n\n")
 		}
 		writeMealMD(w, "Breakfast", day.Meals.Morning)
 		writeMealMD(w, "Lunch", day.Meals.Midday)

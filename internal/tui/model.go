@@ -86,6 +86,7 @@ type Model struct {
 	dateRangeModel dateRangeModel
 	authObj        *auth.Auth
 	tld            string
+	weightUnit     string
 	start          string
 	end            string
 	version        string
@@ -95,7 +96,7 @@ type Model struct {
 }
 
 // Run initialises and starts the TUI, blocking until the user quits.
-func Run(authObj *auth.Auth, tld, preStart, preEnd string, version string) error {
+func Run(authObj *auth.Auth, tld, weightUnit, preStart, preEnd string, version string) error {
 	s := spinner.New()
 	s.Spinner = spinner.Points
 	s.Style = lipgloss.NewStyle().Foreground(colorTeal)
@@ -116,6 +117,7 @@ func Run(authObj *auth.Auth, tld, preStart, preEnd string, version string) error
 		splashModel:   newSplashModel(authObj, version, preStart, preEnd),
 		authObj:       authObj,
 		tld:           tld,
+		weightUnit:    weightUnit,
 		version:       version,
 	}
 
@@ -184,7 +186,7 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		}
 		// Nutrition is embedded in each food entry — compute synchronously, no extra API calls.
 		nutrition := api.ComputeAllNutrition(m.logs)
-		loc := newLocale(m.tld)
+		loc := newLocale(m.tld, m.weightUnit)
 		m.logModel = newLogModel(m.logs, m.width, m.contentHeight(), loc)
 		m.nutriModel = newNutriModel(m.logs, nutrition, m.width, m.contentHeight(), loc)
 		m.insightsModel = newInsightsModel(m.logs, m.width, m.contentHeight())
