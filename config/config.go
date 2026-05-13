@@ -32,6 +32,7 @@ func Load() (*Config, error) {
 	v.SetDefault("tld", "com")
 	v.SetDefault("theme", "auto")
 	v.SetDefault("cache_ttl", 3600)
+	v.SetDefault("weight_unit", "")
 
 	if err := v.ReadInConfig(); err != nil {
 		if _, ok := err.(viper.ConfigFileNotFoundError); !ok {
@@ -42,6 +43,10 @@ func Load() (*Config, error) {
 	var cfg Config
 	if err := v.Unmarshal(&cfg); err != nil {
 		return defaults(), err
+	}
+	// Read weight_unit explicitly — Viper may not surface unregistered keys via Unmarshal.
+	if wu := v.GetString("weight_unit"); wu != "" {
+		cfg.WeightUnit = wu
 	}
 	return &cfg, nil
 }

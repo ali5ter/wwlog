@@ -412,12 +412,14 @@ func writeTrendTable(b *strings.Builder, logs []*api.DayLog, data map[string]*ap
 		)
 		lc.DrawXYAxisAndLabel()
 		// Draw reference threshold line before data so data renders on top.
+		// Uses DrawRuneLineWithStyle with a dashed rune so it reads as a
+		// background guide rather than a data series.
 		if m.ref > 0 {
-			refStyle := lipgloss.NewStyle().Foreground(colorMuted)
-			lc.DrawLineWithStyle(
+			refStyle := lipgloss.NewStyle().Foreground(colorSteel)
+			lc.DrawRuneLineWithStyle(
 				canvas.Float64Point{X: 0, Y: m.ref},
 				canvas.Float64Point{X: float64(n - 1), Y: m.ref},
-				runes.ArcLineStyle,
+				'╌',
 				refStyle,
 			)
 		}
