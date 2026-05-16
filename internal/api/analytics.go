@@ -37,13 +37,15 @@ type MacroBreakdown struct {
 
 // RangeSummary holds high-level statistics for a date range.
 type RangeSummary struct {
-	Days            int
-	TotalItems      int
-	AvgDailyPts     float64
-	AvgDailyTarget  float64
-	DaysUnderBudget int
-	DaysOverBudget  int
-	AvgDailyCals    float64
+	Days                int
+	TotalItems          int
+	AvgDailyPts         float64
+	AvgDailyTarget      float64
+	DaysUnderBudget     int
+	DaysOverBudget      int
+	AvgDailyCals        float64
+	TotalActivityEarned float64
+	DaysWithActivity    int
 }
 
 // TopFoods returns food items sorted by total points then calories, up to limit items.
@@ -183,6 +185,10 @@ func ComputeRangeSummary(logs []*DayLog) RangeSummary {
 		for _, e := range day.AllEntries() {
 			totalCals += e.Nutrition().Calories
 			s.TotalItems++
+		}
+		if p.ActivityEarned > 0 {
+			s.TotalActivityEarned += p.ActivityEarned
+			s.DaysWithActivity++
 		}
 	}
 	n := float64(len(logs))

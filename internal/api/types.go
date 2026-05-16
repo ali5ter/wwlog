@@ -104,6 +104,7 @@ type DayPoints struct {
 	WeeklyAllowanceUsed      float64
 	ActivityEarned           float64
 	ActivityRemaining        float64
+	WeeklyActivityEarned     float64
 	VeggieServings           float64
 	Weight                   float64
 	WeightUnit               string

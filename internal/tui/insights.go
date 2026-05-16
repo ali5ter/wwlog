@@ -131,6 +131,11 @@ func (m *insightsModel) render() string {
 		)
 		fmt.Fprintf(&b, "  %s\n", styleFoodPortion.Render("bar shows % of 2000 kcal reference"))
 	}
+	activityStr := fmt.Sprintf("%.0fpt earned across %d days", summary.TotalActivityEarned, summary.DaysWithActivity)
+	fmt.Fprintf(&b, "  %s  %s\n",
+		lipgloss.NewStyle().Width(10).Render(styleDetailLabel.Render("Activity")),
+		styleDetailValue.Render(activityStr),
+	)
 
 	// ── Points by Meal ─────────────────────────────────────────────
 	fmt.Fprintf(&b, "\n%s\n%s\n\n", styleMealHeading.Render("Points by Meal  (average per day)"), sep)

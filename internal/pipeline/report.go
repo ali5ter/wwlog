@@ -31,18 +31,19 @@ func EmitTextReport(w io.Writer, logs []*api.DayLog) error {
 	if s.AvgDailyCals > 0 {
 		fmt.Fprintf(w, "  Calories:  avg %.0f kcal / day\n", s.AvgDailyCals)
 	}
+	fmt.Fprintf(w, "  Activity:  %.0fpt earned  (%d days with activity)\n", s.TotalActivityEarned, s.DaysWithActivity)
 
 	// Points per day table
 	fmt.Fprintf(w, "\nDAILY POINTS\n")
-	fmt.Fprintf(w, "  %-12s  %6s  %6s  %6s\n", "Date", "Used", "Target", "Left")
-	fmt.Fprintf(w, "  %s\n", strings.Repeat("─", 36))
+	fmt.Fprintf(w, "  %-12s  %6s  %6s  %6s  %8s\n", "Date", "Used", "Target", "Left", "Activity")
+	fmt.Fprintf(w, "  %s\n", strings.Repeat("─", 46))
 	for _, day := range logs {
 		p := day.Points
 		if p.DailyTarget == 0 {
 			continue
 		}
-		fmt.Fprintf(w, "  %-12s  %6.0f  %6.0f  %6.0f\n",
-			day.Date, p.DailyUsed, p.DailyTarget, p.DailyRemaining)
+		fmt.Fprintf(w, "  %-12s  %6.0f  %6.0f  %6.0f  %+8.0f\n",
+			day.Date, p.DailyUsed, p.DailyTarget, p.DailyRemaining, p.ActivityEarned)
 	}
 
 	// Points by meal

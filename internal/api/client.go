@@ -65,6 +65,7 @@ func (c *Client) FetchDay(date string) (*DayLog, error) {
 				WeeklyAllowanceUsed      float64 `json:"weeklyPointAllowanceUsed"`
 				ActivityEarned           float64 `json:"dailyActivityPointsEarned"`
 				ActivityRemaining        float64 `json:"dailyActivityPointsRemaining"`
+				WeeklyActivityEarned     float64 `json:"weeklyActivityPointsEarned"`
 				VeggieServings           float64 `json:"dailyVeggieServings"`
 			} `json:"pointsDetails"`
 			TrackedFoods Meals `json:"trackedFoods"`
@@ -88,6 +89,7 @@ func (c *Client) FetchDay(date string) (*DayLog, error) {
 			WeeklyAllowanceUsed:      pd.WeeklyAllowanceUsed,
 			ActivityEarned:           pd.ActivityEarned,
 			ActivityRemaining:        pd.ActivityRemaining,
+			WeeklyActivityEarned:     pd.WeeklyActivityEarned,
 			VeggieServings:           pd.VeggieServings,
 			Weight:                   pd.Weight,
 			WeightUnit:               strings.TrimSuffix(pd.WeightUnit, "s"),

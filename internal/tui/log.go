@@ -302,8 +302,10 @@ func renderPointsSummary(b *strings.Builder, pts api.DayPoints, contentWidth int
 	if pts.WeeklyAllowanceRemaining != 0 {
 		meta = append(meta, fmt.Sprintf("Weekly bank %+.0f", pts.WeeklyAllowanceRemaining))
 	}
-	if pts.ActivityEarned != 0 {
-		meta = append(meta, fmt.Sprintf("Activity +%.0f earned", pts.ActivityEarned))
+	if pts.WeeklyActivityEarned > 0 {
+		meta = append(meta, fmt.Sprintf("Activity +%.0fpt today  ·  +%.0fpt this week", pts.ActivityEarned, pts.WeeklyActivityEarned))
+	} else {
+		meta = append(meta, fmt.Sprintf("Activity +%.0fpt earned", pts.ActivityEarned))
 	}
 	if pts.Weight > 0 {
 		w, unit := loc.displayWeight(pts.Weight, pts.WeightUnit)
