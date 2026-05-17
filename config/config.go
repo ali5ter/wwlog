@@ -28,6 +28,11 @@ func Load() (*Config, error) {
 	v.SetConfigName("config")
 	v.SetConfigType("toml")
 	v.AddConfigPath(filepath.Join(dir, "wwlog"))
+	// On macOS, UserConfigDir() returns ~/Library/Application Support; also check the
+	// XDG-style ~/.config/wwlog path that most users expect on Unix.
+	if home, err := os.UserHomeDir(); err == nil {
+		v.AddConfigPath(filepath.Join(home, ".config", "wwlog"))
+	}
 
 	v.SetDefault("tld", "com")
 	v.SetDefault("theme", "auto")
