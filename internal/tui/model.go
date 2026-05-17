@@ -4,8 +4,6 @@ package tui
 import (
 	"fmt"
 	"strings"
-	"time"
-
 	"charm.land/bubbles/v2/key"
 	"charm.land/bubbles/v2/spinner"
 	tea "charm.land/bubbletea/v2"
@@ -51,17 +49,6 @@ type dataMsg struct {
 
 type versionMsg struct{ latest string }
 
-// Tab-contextual footer animations.
-var (
-	animLogSpinner = spinner.Spinner{
-		Frames: []string{"∘───", "─∘──", "──∘─", "───∘", "──∘─", "─∘──"},
-		FPS:    time.Second / 8,
-	}
-	animNutriSpinner = spinner.Spinner{
-		Frames: []string{"    ", "·   ", "●   ", "·   ", "    ", "    "},
-		FPS:    time.Second / 3,
-	}
-)
 
 // Model is the top-level Bubble Tea model.
 type Model struct {
@@ -70,10 +57,8 @@ type Model struct {
 	screen appScreen
 	dialog dialogKind
 
-	spinner       spinner.Model
-	animLog       spinner.Model
-	animNutrition spinner.Model
-	loading       bool
+	spinner spinner.Model
+	loading bool
 	err           error
 	activeTab     tab
 	logs          []*api.DayLog
@@ -101,19 +86,9 @@ func Run(authObj *auth.Auth, tld, weightUnit, preStart, preEnd string, version s
 	s.Spinner = spinner.Points
 	s.Style = lipgloss.NewStyle().Foreground(colorTeal)
 
-	al := spinner.New()
-	al.Spinner = animLogSpinner
-	al.Style = lipgloss.NewStyle().Foreground(colorSteel)
-
-	an := spinner.New()
-	an.Spinner = animNutriSpinner
-	an.Style = lipgloss.NewStyle().Foreground(colorSteel)
-
 	m := Model{
-		spinner:       s,
-		animLog:       al,
-		animNutrition: an,
-		screen:        screenSplash,
+		spinner: s,
+		screen:  screenSplash,
 		splashModel:   newSplashModel(authObj, version, preStart, preEnd),
 		authObj:       authObj,
 		tld:           tld,
@@ -129,8 +104,6 @@ func Run(authObj *auth.Auth, tld, weightUnit, preStart, preEnd string, version s
 func (m Model) Init() tea.Cmd {
 	return tea.Batch(
 		m.spinner.Tick,
-		m.animLog.Tick,
-		m.animNutrition.Tick,
 		m.splashModel.init(),
 	)
 }
@@ -207,12 +180,10 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 
 	case spinner.TickMsg:
 		// Always tick every spinner — each Update is a no-op when the ID doesn't match.
-		var c1, c2, c3, c4 tea.Cmd
+		var c1, c2 tea.Cmd
 		m.splashModel, c1 = m.splashModel.update(msg)
 		m.spinner, c2 = m.spinner.Update(msg)
-		m.animLog, c3 = m.animLog.Update(msg)
-		m.animNutrition, c4 = m.animNutrition.Update(msg)
-		return m, tea.Batch(c1, c2, c3, c4)
+		return m, tea.Batch(c1, c2)
 
 	case tea.MouseClickMsg:
 		// Header tab clicks switch tabs. Only handle when a tab area exists
@@ -532,14 +503,7 @@ func (m Model) statusView() string {
 			Padding(0, 1).
 			Render("↑ v" + m.latestVersion + " available")
 	} else {
-		var anim string
-		switch m.activeTab {
-		case tabLog:
-			anim = m.animLog.View()
-		case tabNutrition:
-			anim = m.animNutrition.View()
-		}
-		right = lipgloss.NewStyle().Foreground(colorSteel).Render(anim)
+		right = lipgloss.NewStyle().Foreground(colorMuted).Render("v" + currentNorm)
 	}
 
 	contentWidth := m.width - 2
