@@ -66,9 +66,13 @@ func Load() (*Config, error) {
 	if err := v.Unmarshal(&cfg); err != nil {
 		return defaults(), err
 	}
-	// Read weight_unit explicitly — Viper may not surface unregistered keys via Unmarshal.
+	// Read string keys explicitly — Viper may not surface config-file values via Unmarshal
+	// when the key was also registered with SetDefault (known Viper quirk).
 	if wu := v.GetString("weight_unit"); wu != "" {
 		cfg.WeightUnit = wu
+	}
+	if sd := v.GetString("store_dir"); sd != "" {
+		cfg.StoreDir = sd
 	}
 	return &cfg, nil
 }

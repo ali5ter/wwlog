@@ -77,6 +77,11 @@ func run(cmd *cobra.Command, _ []string) error {
 	if storeDir == "" {
 		storeDir = config.DefaultStoreDir()
 	}
+	if strings.HasPrefix(storeDir, "~/") {
+		if home, err := os.UserHomeDir(); err == nil {
+			storeDir = filepath.Join(home, storeDir[2:])
+		}
+	}
 	var ds api.DayStore
 	if s, err := store.New(storeDir); err != nil {
 		fmt.Fprintf(os.Stderr, "warning: could not open local store at %s: %v\n", storeDir, err)
