@@ -72,6 +72,7 @@ type Model struct {
 	authObj        *auth.Auth
 	tld            string
 	weightUnit     string
+	ds             api.DayStore
 	start          string
 	end            string
 	version        string
@@ -81,7 +82,7 @@ type Model struct {
 }
 
 // Run initialises and starts the TUI, blocking until the user quits.
-func Run(authObj *auth.Auth, tld, weightUnit, preStart, preEnd string, version string) error {
+func Run(authObj *auth.Auth, tld, weightUnit string, ds api.DayStore, preStart, preEnd string, version string) error {
 	s := spinner.New()
 	s.Spinner = spinner.Points
 	s.Style = lipgloss.NewStyle().Foreground(colorTeal)
@@ -93,6 +94,7 @@ func Run(authObj *auth.Auth, tld, weightUnit, preStart, preEnd string, version s
 		authObj:       authObj,
 		tld:           tld,
 		weightUnit:    weightUnit,
+		ds:            ds,
 		version:       version,
 	}
 
@@ -131,6 +133,7 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		tld := m.tld
 		start := msg.start
 		end := msg.end
+		ds := m.ds
 		return m, tea.Batch(
 			func() tea.Msg {
 				token, err := authObj.Token()
@@ -138,7 +141,7 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 					return dataMsg{err: err}
 				}
 				client := api.New(token, tld)
-				logs, notices, err := api.LoadRange(client, start, end)
+				logs, notices, err := api.LoadRange(client, ds, start, end)
 				return dataMsg{logs: logs, client: client, notices: notices, err: err}
 			},
 			func() tea.Msg { return versionMsg{latest: api.FetchLatestVersion()} },
@@ -247,6 +250,7 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 				m.loading = true
 				authObj := m.authObj
 				tld := m.tld
+				ds := m.ds
 				start := m.start
 				end := m.end
 				return m, func() tea.Msg {
@@ -255,7 +259,7 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 						return dataMsg{err: err}
 					}
 					client := api.New(token, tld)
-					logs, notices, err := api.LoadRange(client, start, end)
+					logs, notices, err := api.LoadRange(client, ds, start, end)
 					return dataMsg{logs: logs, client: client, notices: notices, err: err}
 				}
 			}
@@ -323,6 +327,7 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			m.loading = true
 			authObj := m.authObj
 			tld := m.tld
+			ds := m.ds
 			start, end := m.start, m.end
 			return m, func() tea.Msg {
 				token, err := authObj.Token()
@@ -330,7 +335,7 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 					return dataMsg{err: err}
 				}
 				client := api.New(token, tld)
-				logs, notices, err := api.LoadRange(client, start, end)
+				logs, notices, err := api.LoadRange(client, ds, start, end)
 				return dataMsg{logs: logs, client: client, notices: notices, err: err}
 			}
 		}

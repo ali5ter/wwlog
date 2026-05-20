@@ -214,6 +214,27 @@ Optional config at `~/.config/wwlog/config.toml`:
 ```toml
 tld         = "com"   # WW top-level domain
 weight_unit = "lb"    # override weight unit: "lb" or "kg" (default: from API)
+store_dir   = ""      # local store path (default: alongside this config file)
+```
+
+## Local store
+
+wwlog maintains a local store of your food log data — one JSON file per day — so
+you can access dates beyond the WW API's ~90-day retention window.
+
+**Default location:**
+
+- macOS: `~/Library/Application Support/wwlog/store/`
+- Linux: `~/.config/wwlog/store/`
+
+On every run wwlog fetches the requested date range from the API and upserts each
+day into the store. Dates older than 89 days are served from the store automatically.
+
+**Cloud sync:** set `store_dir` in `config.toml` to a folder inside Dropbox, iCloud
+Drive, or any synced directory to share your history across machines:
+
+```toml
+store_dir = "~/Dropbox/wwlog-store"
 ```
 
 ## Credits

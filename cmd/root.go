@@ -12,6 +12,7 @@ import (
 	"github.com/ali5ter/wwlog/internal/api"
 	"github.com/ali5ter/wwlog/internal/auth"
 	"github.com/ali5ter/wwlog/internal/pipeline"
+	"github.com/ali5ter/wwlog/internal/store"
 	"github.com/ali5ter/wwlog/internal/tui"
 	"github.com/spf13/cobra"
 	"golang.org/x/term"
@@ -70,6 +71,17 @@ func run(cmd *cobra.Command, _ []string) error {
 	tld := flagTLD
 	if cfg.TLD != "" {
 		tld = cfg.TLD
+	}
+
+	storeDir := cfg.StoreDir
+	if storeDir == "" {
+		storeDir = config.DefaultStoreDir()
+	}
+	var ds api.DayStore
+	if s, err := store.New(storeDir); err != nil {
+		fmt.Fprintf(os.Stderr, "warning: could not open local store at %s: %v\n", storeDir, err)
+	} else {
+		ds = s
 	}
 
 	authenticator := &auth.Auth{TLD: tld}
@@ -145,7 +157,7 @@ func run(cmd *cobra.Command, _ []string) error {
 		if err != nil {
 			return fmt.Errorf("%w\nRun 'wwlog --login' to authenticate", err)
 		}
-		logs, notices, err := api.LoadRange(api.New(token, tld), start, end)
+		logs, notices, err := api.LoadRange(api.New(token, tld), ds, start, end)
 		for _, n := range notices {
 			fmt.Fprintln(os.Stderr, "note:", n)
 		}
@@ -193,7 +205,7 @@ func run(cmd *cobra.Command, _ []string) error {
 			return fmt.Errorf("%w\nRun 'wwlog --login' to authenticate", err)
 		}
 		client := api.New(token, tld)
-		logs, notices, err := api.LoadRange(client, start, end)
+		logs, notices, err := api.LoadRange(client, ds, start, end)
 		for _, n := range notices {
 			fmt.Fprintln(os.Stderr, "note:", n)
 		}
@@ -207,7 +219,7 @@ func run(cmd *cobra.Command, _ []string) error {
 	}
 
 	// TUI mode: auth and date range handled inside the TUI.
-	return tui.Run(authenticator, tld, cfg.WeightUnit, flagStart, flagEnd, version)
+	return tui.Run(authenticator, tld, cfg.WeightUnit, ds, flagStart, flagEnd, version)
 }
 
 func readPassword() (string, error) {
