@@ -176,10 +176,12 @@ func ComputeRangeSummary(logs []*DayLog) RangeSummary {
 		totalPts += consumed
 		totalTarget += p.DailyTarget
 		if p.DailyTarget > 0 {
-			if consumed <= p.DailyTarget {
-				s.DaysUnderBudget++
-			} else {
+			// Dipping into the weekly bank is on-budget; only count as over
+			// when both the daily target and the weekly allowance are exhausted.
+			if consumed > p.DailyTarget && p.WeeklyAllowanceRemaining < 0 {
 				s.DaysOverBudget++
+			} else {
+				s.DaysUnderBudget++
 			}
 		}
 		for _, e := range day.AllEntries() {

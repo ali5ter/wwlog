@@ -255,18 +255,25 @@ func renderHeatmap(logs []*api.DayLog, vw int) string {
 	const layout = "2006-01-02"
 
 	type entry struct {
-		ratio     float64
-		hasTarget bool
+		ratio            float64
+		hasTarget        bool
+		weeklyExhausted  bool
 	}
 	days := make(map[string]entry, len(logs))
 	for _, log := range logs {
 		if log.Points.DailyTarget > 0 {
-			// Use TotalPointsConsumed (sum of food entries' PointsPrecise)
-			// rather than Points.DailyUsed — the latter caps at DailyTarget,
-			// hiding over-budget days that flowed into the weekly allowance.
+			consumed := log.TotalPointsConsumed()
+			ratio := consumed / log.Points.DailyTarget
+			// Purple only when both daily target and weekly bank are exhausted.
+			// Dipping into the weekly allowance is on-budget by WW rules.
+			weeklyExhausted := consumed > log.Points.DailyTarget && log.Points.WeeklyAllowanceRemaining < 0
+			if !weeklyExhausted && ratio > 1.0 {
+				ratio = 1.0
+			}
 			days[log.Date] = entry{
-				ratio:     log.TotalPointsConsumed() / log.Points.DailyTarget,
-				hasTarget: true,
+				ratio:           ratio,
+				hasTarget:       true,
+				weeklyExhausted: weeklyExhausted,
 			}
 		} else {
 			days[log.Date] = entry{hasTarget: false}
@@ -332,7 +339,7 @@ func renderHeatmap(logs []*api.DayLog, vw int) string {
 		}
 		var c color.Color
 		switch {
-		case e.ratio > 1.02:
+		case e.weeklyExhausted:
 			c = colorPurple
 		case e.ratio >= 0.85:
 			c = palette[4]
