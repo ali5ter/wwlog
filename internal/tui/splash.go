@@ -192,6 +192,13 @@ func (m splashModel) update(msg tea.Msg) (splashModel, tea.Cmd) {
 		case splashDateRange:
 			start := m.form.GetString("start")
 			end := m.form.GetString("end")
+			if start > end {
+				m.err = "start date must not be after end date"
+				m.preStart = start
+				m.preEnd = end
+				m.form = m.buildDateForm()
+				return m, m.form.Init()
+			}
 			return m, func() tea.Msg { return splashDoneMsg{start: start, end: end} }
 		}
 	}
@@ -263,6 +270,7 @@ type dateRangeModel struct {
 	form   *huh.Form
 	width  int
 	height int
+	err    string
 }
 
 func newDateRangeModel(start, end string, width, height int) dateRangeModel {
@@ -294,7 +302,11 @@ func (m dateRangeModel) view() string {
 	if m.width == 0 || m.height == 0 {
 		return ""
 	}
-	return renderDialog("Change date range", m.form.View(), "esc cancel · enter submit · tab next field")
+	body := m.form.View()
+	if m.err != "" {
+		body = lipgloss.JoinVertical(lipgloss.Left, styleError.Render(m.err), "", body)
+	}
+	return renderDialog("Change date range", body, "esc cancel · enter submit · tab next field")
 }
 
 // wwHuhTheme is a huh.Theme styled with the WW colour palette.

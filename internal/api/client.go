@@ -122,7 +122,8 @@ func DateRange(start, end string) ([]string, error) {
 // published version tag (without the leading "v"), e.g. "1.2.3".
 // Returns an empty string on any error so callers can treat it as optional.
 func FetchLatestVersion() string {
-	resp, err := http.Get("https://api.github.com/repos/ali5ter/wwlog/releases/latest")
+	c := &http.Client{Timeout: 3 * time.Second}
+	resp, err := c.Get("https://api.github.com/repos/ali5ter/wwlog/releases/latest")
 	if err != nil {
 		return ""
 	}

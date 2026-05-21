@@ -27,12 +27,16 @@ func WriteLogCSV(w io.Writer, logs []*api.DayLog) error {
 	cw := csv.NewWriter(w)
 	_ = cw.Write([]string{"Date", "Meal", "Food", "Serving", "Points", "Calories", "Protein (g)", "Carbs (g)", "Fat (g)", "Fiber (g)", "Sodium (mg)", "Added Sugar (g)"})
 	for _, day := range logs {
-		for meal, entries := range map[string][]api.FoodEntry{
-			"Breakfast": day.Meals.Morning,
-			"Lunch":     day.Meals.Midday,
-			"Dinner":    day.Meals.Evening,
-			"Snacks":    day.Meals.Anytime,
+		for _, m := range []struct {
+			name    string
+			entries []api.FoodEntry
+		}{
+			{"Breakfast", day.Meals.Morning},
+			{"Lunch", day.Meals.Midday},
+			{"Dinner", day.Meals.Evening},
+			{"Snacks", day.Meals.Anytime},
 		} {
+			meal, entries := m.name, m.entries
 			for _, e := range entries {
 				serving := e.ServingDesc
 				if serving == "" && e.PortionName != "" {

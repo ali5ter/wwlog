@@ -244,15 +244,20 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			var cmd tea.Cmd
 			m.dateRangeModel, cmd = m.dateRangeModel.update(msg)
 			if m.dateRangeModel.form.State == huh.StateCompleted {
-				m.start = m.dateRangeModel.form.GetString("start")
-				m.end = m.dateRangeModel.form.GetString("end")
+				start := m.dateRangeModel.form.GetString("start")
+				end := m.dateRangeModel.form.GetString("end")
+				if start > end {
+					m.dateRangeModel = newDateRangeModel(start, end, m.width, m.height)
+					m.dateRangeModel.err = "start date must not be after end date"
+					return m, m.dateRangeModel.form.Init()
+				}
+				m.start = start
+				m.end = end
 				m.dialog = dialogNone
 				m.loading = true
 				authObj := m.authObj
 				tld := m.tld
 				ds := m.ds
-				start := m.start
-				end := m.end
 				return m, func() tea.Msg {
 					token, err := authObj.Token()
 					if err != nil {
@@ -321,14 +326,20 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		m.dateRangeModel, cmd = m.dateRangeModel.update(msg)
 		// huh may complete via an internal message rather than a KeyMsg.
 		if m.dateRangeModel.form.State == huh.StateCompleted {
-			m.start = m.dateRangeModel.form.GetString("start")
-			m.end = m.dateRangeModel.form.GetString("end")
+			start := m.dateRangeModel.form.GetString("start")
+			end := m.dateRangeModel.form.GetString("end")
+			if start > end {
+				m.dateRangeModel = newDateRangeModel(start, end, m.width, m.height)
+				m.dateRangeModel.err = "start date must not be after end date"
+				return m, m.dateRangeModel.form.Init()
+			}
+			m.start = start
+			m.end = end
 			m.dialog = dialogNone
 			m.loading = true
 			authObj := m.authObj
 			tld := m.tld
 			ds := m.ds
-			start, end := m.start, m.end
 			return m, func() tea.Msg {
 				token, err := authObj.Token()
 				if err != nil {

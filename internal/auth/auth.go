@@ -58,9 +58,15 @@ func (a *Auth) Login(email, password string) (string, error) {
 		return "", err
 	}
 
-	_ = keyring.Set(serviceName, keyEmail, email)
-	_ = keyring.Set(serviceName, keyPassword, password)
-	_ = keyring.Set(serviceName, keyToken, token)
+	if err := keyring.Set(serviceName, keyEmail, email); err != nil {
+		return "", fmt.Errorf("store credentials: %w", err)
+	}
+	if err := keyring.Set(serviceName, keyPassword, password); err != nil {
+		return "", fmt.Errorf("store credentials: %w", err)
+	}
+	if err := keyring.Set(serviceName, keyToken, token); err != nil {
+		return "", fmt.Errorf("store credentials: %w", err)
+	}
 
 	return token, nil
 }

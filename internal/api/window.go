@@ -4,6 +4,8 @@ import (
 	"errors"
 	"fmt"
 	"time"
+
+	"golang.org/x/sync/errgroup"
 )
 
 // APIWindowDays is the WW my-day endpoint's hard backwards retention window
@@ -129,25 +131,55 @@ func LoadRange(client *Client, ds DayStore, start, end string) ([]*DayLog, []str
 		return logs, notices, nil
 	}
 
-	// In-window dates — fetch from API, save to store.
-	var skipped int
-	for _, date := range apiDates {
-		day, err := client.FetchDay(date)
-		if err != nil {
-			if errors.Is(err, ErrOutOfWindow) {
-				skipped++
-				if ds != nil {
-					if d, ok := ds.Load(date); ok {
-						logs = append(logs, d)
+	// In-window dates — fetch from API concurrently (bounded pool), save to store.
+	type fetchResult struct {
+		day     *DayLog
+		skipped bool
+	}
+	results := make([]fetchResult, len(apiDates))
+
+	const maxConcurrent = 10
+	var g errgroup.Group
+	sem := make(chan struct{}, maxConcurrent)
+
+	for i, date := range apiDates {
+		i, date := i, date
+		g.Go(func() error {
+			sem <- struct{}{}
+			defer func() { <-sem }()
+
+			day, err := client.FetchDay(date)
+			if err != nil {
+				if errors.Is(err, ErrOutOfWindow) {
+					results[i].skipped = true
+					if ds != nil {
+						if d, ok := ds.Load(date); ok {
+							results[i].day = d
+						}
 					}
+					return nil
 				}
-				continue
+				return fmt.Errorf("fetch %s: %w", date, err)
 			}
-			return nil, notices, fmt.Errorf("fetch %s: %w", date, err)
+			results[i].day = day
+			if ds != nil {
+				_ = ds.Save(day)
+			}
+			return nil
+		})
+	}
+
+	if err := g.Wait(); err != nil {
+		return nil, notices, err
+	}
+
+	var skipped int
+	for _, r := range results {
+		if r.skipped {
+			skipped++
 		}
-		logs = append(logs, day)
-		if ds != nil {
-			_ = ds.Save(day)
+		if r.day != nil {
+			logs = append(logs, r.day)
 		}
 	}
 	if skipped > 0 {
