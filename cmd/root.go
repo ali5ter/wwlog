@@ -19,18 +19,21 @@ import (
 )
 
 var (
-	flagStart  string
-	flagEnd    string
-	flagJSON   bool
-	flagReport bool
-	flagNoTTY  bool
-	flagLogin  bool
-	flagLogout bool
-	flagTLD    string
-	flagRaw    bool
-	flagExport string
-	flagOutput string
-	version    = "0.1.0"
+	flagStart   string
+	flagEnd     string
+	flagJSON    bool
+	flagReport  bool
+	flagNoTTY   bool
+	flagLogin   bool
+	flagLogout  bool
+	flagTLD     string
+	flagRaw     bool
+	flagExport  string
+	flagOutput  string
+	flagArchive bool
+	flagStatus  bool
+	flagOffline bool
+	version     = "0.1.0"
 )
 
 var rootCmd = &cobra.Command{
@@ -60,6 +63,9 @@ func init() {
 	_ = rootCmd.Flags().MarkHidden("raw")
 	rootCmd.Flags().StringVar(&flagExport, "export", "", "Export format: json, csv, markdown, report")
 	rootCmd.Flags().StringVarP(&flagOutput, "output", "o", "", "Output file or directory (default: reports/)")
+	rootCmd.Flags().BoolVar(&flagArchive, "archive", false, "Pull the full API window into the local store")
+	rootCmd.Flags().BoolVar(&flagStatus, "status", false, "Show local archive coverage and exit")
+	rootCmd.Flags().BoolVar(&flagOffline, "offline", false, "Serve data from local archive only (no API calls)")
 }
 
 func run(cmd *cobra.Command, _ []string) error {
@@ -120,6 +126,25 @@ func run(cmd *cobra.Command, _ []string) error {
 		return nil
 	}
 
+	// Status: show local archive metadata and exit.
+	if flagStatus {
+		if s, ok := ds.(*store.Store); ok && s != nil {
+			runStatus(s)
+		} else {
+			fmt.Fprintln(os.Stderr, "No local store configured. Set store_dir in config or use the default location.")
+		}
+		return nil
+	}
+
+	// Archive: bulk-pull the full API window into the local store.
+	if flagArchive {
+		s, ok := ds.(*store.Store)
+		if !ok || s == nil {
+			return fmt.Errorf("--archive requires a local store; check store_dir in config")
+		}
+		return runArchive(authenticator, tld, s)
+	}
+
 	// Raw API dump for inspection (hidden flag, not shown in --help).
 	if flagRaw {
 		start := flagStart
@@ -162,7 +187,7 @@ func run(cmd *cobra.Command, _ []string) error {
 		if err != nil {
 			return fmt.Errorf("%w\nRun 'wwlog --login' to authenticate", err)
 		}
-		logs, notices, err := api.LoadRange(api.New(token, tld), ds, start, end)
+		logs, notices, err := api.LoadRange(api.New(token, tld), ds, start, end, false)
 		for _, n := range notices {
 			fmt.Fprintln(os.Stderr, "note:", n)
 		}
@@ -196,7 +221,7 @@ func run(cmd *cobra.Command, _ []string) error {
 	}
 
 	// Pipeline mode: requires explicit dates; defaults to today if omitted.
-	if flagJSON || flagReport || flagNoTTY || !isTTY() {
+	if flagJSON || flagReport || flagNoTTY || flagOffline || !isTTY() {
 		start := flagStart
 		if start == "" {
 			start = time.Now().Format("2006-01-02")
@@ -205,12 +230,15 @@ func run(cmd *cobra.Command, _ []string) error {
 		if end == "" {
 			end = time.Now().Format("2006-01-02")
 		}
-		token, err := authenticator.Token()
-		if err != nil {
-			return fmt.Errorf("%w\nRun 'wwlog --login' to authenticate", err)
+		var client *api.Client
+		if !flagOffline {
+			token, err := authenticator.Token()
+			if err != nil {
+				return fmt.Errorf("%w\nRun 'wwlog --login' to authenticate", err)
+			}
+			client = api.New(token, tld)
 		}
-		client := api.New(token, tld)
-		logs, notices, err := api.LoadRange(client, ds, start, end)
+		logs, notices, err := api.LoadRange(client, ds, start, end, flagOffline)
 		for _, n := range notices {
 			fmt.Fprintln(os.Stderr, "note:", n)
 		}

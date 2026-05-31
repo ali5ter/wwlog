@@ -141,7 +141,7 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 					return dataMsg{err: err}
 				}
 				client := api.New(token, tld)
-				logs, notices, err := api.LoadRange(client, ds, start, end)
+				logs, notices, err := api.LoadRange(client, ds, start, end, false)
 				return dataMsg{logs: logs, client: client, notices: notices, err: err}
 			},
 			func() tea.Msg { return versionMsg{latest: api.FetchLatestVersion()} },
@@ -264,7 +264,7 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 						return dataMsg{err: err}
 					}
 					client := api.New(token, tld)
-					logs, notices, err := api.LoadRange(client, ds, start, end)
+					logs, notices, err := api.LoadRange(client, ds, start, end, false)
 					return dataMsg{logs: logs, client: client, notices: notices, err: err}
 				}
 			}
@@ -346,7 +346,7 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 					return dataMsg{err: err}
 				}
 				client := api.New(token, tld)
-				logs, notices, err := api.LoadRange(client, ds, start, end)
+				logs, notices, err := api.LoadRange(client, ds, start, end, false)
 				return dataMsg{logs: logs, client: client, notices: notices, err: err}
 			}
 		}

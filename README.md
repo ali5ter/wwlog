@@ -1,20 +1,26 @@
 # wwlog
 
-`wwlog` unlocks the WeightWatchers data you enter in the mobile app.
+Your WeightWatchers food log data, permanently yours.
 
-It provides a CLI for exporting text, Markdown, JSON, and CSV so you can analyze your data with your own
-tools across a selected date range.
+`wwlog` builds a local archive of your WW food log and gives you more insight into it
+than the WW app provides. The archive grows every time you run it — and keeps working
+long after any particular subscription or app version.
 
-It also includes a TUI for browsing daily logs, comparing nutrition, and viewing insights across a selected date range.
+It includes a full-featured TUI for browsing daily logs, comparing nutrition, and
+viewing insights, plus a pipeline mode for scripting and file export.
 
 ![wwlog demo](examples/wwlog_demo.gif)
 
 ## Features
 
+- **Local archive** — a permanent, plain-JSON store of your food log that survives
+  subscription changes, API windows, and app discontinuations
+- **Offline mode** — browse, report, and export from your local archive with no
+  network calls required
 - **Log tab** — day-by-day food log with a points bar, meal breakdown, and per-entry kcal;
   filter by date and sort entries by points or calories
 - **Nutrition tab** — nutrient bars vs. recommended daily values, per-day averages,
-  and asciigraph trend charts for calories, protein, carbs, and fat across the selected range
+  and trend charts for calories, protein, carbs, and fat across the selected range
 - **Insights tab** — a calendar heatmap of daily points budget, range summary,
   points by meal, macro distribution, top foods by points, and a zero-point food log
 - **Pipeline mode** — `--json`, `--report`, and `--export` flags for scripting and file output
@@ -54,15 +60,24 @@ sudo mv wwlog /usr/local/bin/
 go install github.com/ali5ter/wwlog@latest
 ```
 
-## First-time setup
+## Quick start
 
-Authenticate once — credentials are stored securely in your system keychain:
+**1. Authenticate** — credentials are stored securely in your system keychain:
 
 ```bash
 wwlog --login
 ```
 
-## Usage
+**2. Archive your history** — pull the full available history into your local store:
+
+```bash
+wwlog --archive
+```
+
+Run this once to capture everything the WW API can return (~90 days). Run it again
+any time to update. Your archive is plain JSON files — readable, portable, and yours.
+
+**3. Browse or export:**
 
 ```bash
 # Open the TUI (defaults to the last 7 days)
@@ -71,36 +86,91 @@ wwlog
 # Browse a specific date range
 wwlog --start 2026-04-20 --end 2026-04-26
 
-# Print insights report to stdout (no TUI)
+# Print insights report to stdout
 wwlog --start 2026-04-20 --end 2026-04-26 --report
 
-# Output log as JSON to stdout
+# Output log as JSON
 wwlog --start 2026-04-20 --end 2026-04-26 --json
 
-# Export to a file (JSON | CSV | Markdown | report)
+# Export to a file (json | csv | markdown | report)
 wwlog --start 2026-04-20 --end 2026-04-26 --export markdown
 wwlog --start 2026-04-20 --end 2026-04-26 --export json --output ~/Downloads/
-
-# Clear stored credentials
-wwlog --logout
 ```
 
-## Data window
+## Archive & offline
 
-The WW `my-day` endpoint enforces a hard ~90-day backwards retention window — any date more
-than 89 days before today returns HTTP 400, regardless of how long you've held your WW account.
-This is a server-side policy, not a wwlog limitation.
-
-If `--start` is older than the window, wwlog clamps it forward and prints a one-line notice:
+### Building your archive
 
 ```bash
-$ wwlog --start 2024-01-01 --end 2026-05-05 --report
-note: --start clamped to 2026-02-05 (WW retains ~90 days)
+# Pull the full API window into your local store (~90 days)
+wwlog --archive
+
+# Check what your archive covers
+wwlog --status
 ```
 
-If `--end` is also older than the window, wwlog errors out before making any API calls. There's
-no workaround — long-running history exports aren't possible with this API. Plan ahead if you
-want to keep more than ~3 months of records: pull `--export json` regularly and archive the files.
+`--status` output:
+
+```text
+Store     ~/Library/Application Support/wwlog/store
+Coverage  2026-02-26 → 2026-05-31  (95 days)
+```
+
+`--archive` output:
+
+```text
+Archiving 90 days (2026-03-03 → 2026-05-31)
+  fetched 90 / 90...
+Archive complete.
+  New       85 days
+  Updated    5 days
+  Stored    95 days total (2026-02-26 → 2026-05-31)
+```
+
+Run `--archive` regularly to keep your store current. It is safe to run repeatedly —
+existing entries are updated, not duplicated.
+
+### Browsing your archive offline
+
+Once you have a local archive, wwlog works with no network connection:
+
+```bash
+# No API calls — serves entirely from your local archive
+wwlog --offline --start 2026-01-01 --end 2026-03-31 --report
+wwlog --offline --start 2026-01-01 --end 2026-03-31 --json
+```
+
+The TUI also falls back to your archive automatically when the WW API is unavailable,
+surfacing a notice in the status bar rather than erroring out.
+
+### Cloud sync
+
+Set `store_dir` in `config.toml` to a Dropbox, iCloud Drive, or any synced folder to
+share your archive across machines:
+
+```toml
+store_dir = "~/Dropbox/wwlog-store"
+```
+
+### The API retention window
+
+The WW API enforces a hard ~90-day backwards retention limit — dates older than 89 days
+return HTTP 400 regardless of account age. Your local archive is the solution: once a day
+is stored locally, it's available indefinitely regardless of the API window.
+
+If you request a range that starts before the window, wwlog serves older dates from your
+archive automatically and fetches the in-window dates from the API:
+
+```text
+note: 45 day(s) loaded from local store
+```
+
+If the API is unavailable for any dates in the window, wwlog falls back to your archive
+for those dates and continues:
+
+```text
+note: API unavailable for 3 day(s) — showing archived data where available
+```
 
 ## JSON pipeline examples
 
@@ -179,6 +249,12 @@ wwlog --start 2026-04-20 --end 2026-04-26 --json \
 > Macros are scaled to the tracked portion size, then converted to kcal using Atwater factors
 > (protein and carbs ×4, fat ×9) to match what the Insights tab shows.
 
+All pipeline examples work with `--offline` — no WW API required:
+
+```bash
+wwlog --offline --start 2026-04-20 --end 2026-04-26 --json | jq '...'
+```
+
 ## Key bindings
 
 | Key | Action |
@@ -198,6 +274,9 @@ wwlog --start 2026-04-20 --end 2026-04-26 --json \
 |------|---------|-------------|
 | `-s`, `--start` | 7 days ago | Start date (YYYY-MM-DD) |
 | `-e`, `--end` | today | End date (YYYY-MM-DD) |
+| `--archive` | — | Pull the full API window into the local store |
+| `--status` | — | Show local archive coverage and exit |
+| `--offline` | — | Serve from local archive only (no API calls) |
 | `--json` | — | Output log as JSON to stdout (no TUI) |
 | `-r`, `--report` | — | Output insights report as text to stdout (no TUI) |
 | `--export` | — | Export to file: `json`, `csv`, `markdown`, or `report` |
@@ -214,27 +293,7 @@ Optional config at `~/.config/wwlog/config.toml`:
 ```toml
 tld         = "com"   # WW top-level domain
 weight_unit = "lb"    # override weight unit: "lb" or "kg" (default: from API)
-store_dir   = ""      # local store path (default: alongside this config file)
-```
-
-## Local store
-
-wwlog maintains a local store of your food log data — one JSON file per day — so
-you can access dates beyond the WW API's ~90-day retention window.
-
-**Default location:**
-
-- macOS: `~/Library/Application Support/wwlog/store/`
-- Linux: `~/.config/wwlog/store/`
-
-On every run wwlog fetches the requested date range from the API and upserts each
-day into the store. Dates older than 89 days are served from the store automatically.
-
-**Cloud sync:** set `store_dir` in `config.toml` to a folder inside Dropbox, iCloud
-Drive, or any synced directory to share your history across machines:
-
-```toml
-store_dir = "~/Dropbox/wwlog-store"
+store_dir   = ""      # local archive path (default: alongside this config file)
 ```
 
 ## Credits

@@ -11,6 +11,7 @@ import (
 	"path/filepath"
 	"sort"
 	"strings"
+	"time"
 
 	"github.com/ali5ter/wwlog/internal/api"
 )
@@ -54,6 +55,39 @@ func (s *Store) Save(day *api.DayLog) error {
 		return err
 	}
 	return os.WriteFile(filepath.Join(s.dir, day.Date+".json"), data, 0o644)
+}
+
+// Stats holds aggregate metadata about the store contents.
+type Stats struct {
+	Dir       string
+	FirstDate string
+	LastDate  string
+	DayCount  int
+	GapCount  int
+}
+
+// Stats returns aggregate metadata about the store contents.
+func (s *Store) Stats() Stats {
+	dates := s.Dates()
+	if len(dates) == 0 {
+		return Stats{Dir: s.dir}
+	}
+	const layout = "2006-01-02"
+	var gaps int
+	for i := 1; i < len(dates); i++ {
+		prev, _ := time.Parse(layout, dates[i-1])
+		curr, _ := time.Parse(layout, dates[i])
+		if curr.Sub(prev) > 24*time.Hour {
+			gaps++
+		}
+	}
+	return Stats{
+		Dir:       s.dir,
+		FirstDate: dates[0],
+		LastDate:  dates[len(dates)-1],
+		DayCount:  len(dates),
+		GapCount:  gaps,
+	}
 }
 
 // Dates returns all dates present in the store, sorted ascending.
