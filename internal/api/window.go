@@ -120,19 +120,26 @@ func LoadRange(client *Client, ds DayStore, start, end string, offline bool) ([]
 					misses++
 				}
 			}
+			if offline && hits == 0 && misses > 0 {
+				return nil, nil, fmt.Errorf(
+					"local archive has no data for the requested range — run 'wwlog --archive' to populate it",
+				)
+			}
 			if offline && hits > 0 {
 				notices = append(notices, fmt.Sprintf("offline — %d day(s) loaded from local archive", hits))
 			} else if !offline && hits > 0 {
 				notices = append(notices, fmt.Sprintf("%d day(s) loaded from local store", hits))
 			}
 			if misses > 0 {
-				label := "outside retention window and"
 				if offline {
-					label = ""
+					notices = append(notices, fmt.Sprintf(
+						"%d day(s) not in local archive", misses,
+					))
+				} else {
+					notices = append(notices, fmt.Sprintf(
+						"%d day(s) outside retention window and not in local store", misses,
+					))
 				}
-				notices = append(notices, fmt.Sprintf(
-					"%d day(s) %s not in local store", misses, label,
-				))
 			}
 		}
 	}

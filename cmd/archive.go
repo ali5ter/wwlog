@@ -119,8 +119,8 @@ func runArchive(authenticator *auth.Auth, tld string, s *store.Store) error {
 func runStatus(s *store.Store) {
 	stats := s.Stats()
 	if stats.DayCount == 0 {
-		fmt.Fprintf(os.Stderr, "Store    %s\n", stats.Dir)
-		fmt.Fprintln(os.Stderr, "         (empty — run 'wwlog --archive' to populate)")
+		fmt.Fprintf(os.Stderr, "Store     %s\n", stats.Dir)
+		fmt.Fprintln(os.Stderr, "          (empty — run 'wwlog --archive' to populate)")
 		return
 	}
 	gapStr := ""
@@ -130,4 +130,32 @@ func runStatus(s *store.Store) {
 	fmt.Fprintf(os.Stderr, "Store     %s\n", stats.Dir)
 	fmt.Fprintf(os.Stderr, "Coverage  %s → %s  (%d days%s)\n",
 		stats.FirstDate, stats.LastDate, stats.DayCount, gapStr)
+
+	if stats.GapCount == 0 {
+		return
+	}
+
+	// List each gap range so the user knows exactly which dates are missing.
+	const layout = "2006-01-02"
+	dates := s.Dates()
+	first := true
+	for i := 1; i < len(dates); i++ {
+		prev, _ := time.Parse(layout, dates[i-1])
+		curr, _ := time.Parse(layout, dates[i])
+		if curr.Sub(prev) <= 24*time.Hour {
+			continue
+		}
+		gapStart := prev.AddDate(0, 0, 1)
+		gapEnd := curr.AddDate(0, 0, -1)
+		label := "Gaps"
+		if !first {
+			label = "    "
+		}
+		if gapStart.Equal(gapEnd) {
+			fmt.Fprintf(os.Stderr, "%s      %s\n", label, gapStart.Format(layout))
+		} else {
+			fmt.Fprintf(os.Stderr, "%s      %s → %s\n", label, gapStart.Format(layout), gapEnd.Format(layout))
+		}
+		first = false
+	}
 }
