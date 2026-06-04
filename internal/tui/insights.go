@@ -113,7 +113,7 @@ func (m *insightsModel) render() string {
 	fmt.Fprintf(&b, "  %s\n\n", styleDetailValue.Render(daysStr))
 
 	if summary.AvgDailyTarget > 0 {
-		ptsBar := makeBar(summary.AvgDailyPts, summary.AvgDailyTarget, barWidth)
+		ptsBar := makeBar(summary.AvgDailyPts, summary.AvgDailyTarget, barWidth, false)
 		fmt.Fprintf(&b, "  %s  %s  %s\n",
 			lipgloss.NewStyle().Width(10).Render(styleDetailLabel.Render("Points")),
 			ptsBar,
@@ -123,7 +123,7 @@ func (m *insightsModel) render() string {
 		fmt.Fprintf(&b, "  %s\n", styleFoodPortion.Render(budgetStr))
 	}
 	if summary.AvgDailyCals > 0 {
-		calBar := makeBar(summary.AvgDailyCals, 2000, barWidth)
+		calBar := makeBar(summary.AvgDailyCals, 2000, barWidth, false)
 		fmt.Fprintf(&b, "  %s  %s  %s\n",
 			lipgloss.NewStyle().Width(10).Render(styleDetailLabel.Render("Calories")),
 			calBar,
@@ -150,7 +150,7 @@ func (m *insightsModel) render() string {
 		maxMealPts = 1
 	}
 	for _, ms := range meals {
-		bar := makeBar(ms.AvgPts, maxMealPts, barWidth)
+		bar := makeBar(ms.AvgPts, maxMealPts, barWidth, false)
 		label := lipgloss.NewStyle().Width(12).Render(styleDetailLabel.Render(ms.Symbol + "  " + ms.Name))
 		val := styleDetailValue.Render(fmt.Sprintf("%.1fpt", ms.AvgPts))
 		cal := styleFoodPortion.Render(fmt.Sprintf("  %.0f kcal", ms.AvgCals))
@@ -188,7 +188,7 @@ func (m *insightsModel) render() string {
 		n := float64(daysWithData)
 		fmt.Fprintf(&b, "\n%s\n%s\n\n", styleMealHeading.Render("Daily Averages  (fiber · sodium · added sugar)"), sep)
 		writeMicroBar := func(label, unit string, avg, ref float64) {
-			bar := makeBar(avg, ref, barWidth)
+			bar := makeBar(avg, ref, barWidth, false)
 			labelCol := lipgloss.NewStyle().Width(13).Render(styleDetailLabel.Render(label))
 			valCol := lipgloss.NewStyle().Width(12).Render(styleDetailValue.Render(fmt.Sprintf("%s %s", formatNutriValue(avg), unit)))
 			refStr := styleFoodPortion.Render(fmt.Sprintf("ref %s", formatNutriValue(ref)))
@@ -240,7 +240,7 @@ func (m *insightsModel) render() string {
 }
 
 func writeMacroBar(b *strings.Builder, label string, pct, grams float64, unit string, barWidth int) {
-	bar := makeBar(pct, 100, barWidth)
+	bar := makeBar(pct, 100, barWidth, false)
 	labelCol := lipgloss.NewStyle().Width(11).Render(styleDetailLabel.Render(label))
 	pctCol := lipgloss.NewStyle().Width(6).Render(styleDetailValue.Render(fmt.Sprintf("%.0f%%", pct)))
 	gramCol := styleFoodPortion.Render(fmt.Sprintf("%.0f%s avg", grams, unit))

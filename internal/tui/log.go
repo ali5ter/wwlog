@@ -289,7 +289,7 @@ func renderPointsSummary(b *strings.Builder, pts api.DayPoints, contentWidth int
 		return
 	}
 	barWidth := 20
-	bar := makeBar(pts.DailyUsed, pts.DailyTarget, barWidth)
+	bar := makeBar(pts.DailyUsed, pts.DailyTarget, barWidth, false)
 
 	usedStr := styleDetailValue.Render(fmt.Sprintf("%.0f", pts.DailyUsed))
 	targetStr := styleFoodPortion.Render(fmt.Sprintf("/ %.0f", pts.DailyTarget))

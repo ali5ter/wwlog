@@ -5,11 +5,14 @@ import (
 	"io"
 	"strings"
 
+	"github.com/ali5ter/wwlog/config"
 	"github.com/ali5ter/wwlog/internal/api"
 )
 
 // EmitTextReport writes a human-readable insights report to w.
-func EmitTextReport(w io.Writer, logs []*api.DayLog) error {
+// When targets is non-nil and has configured values, the DAILY AVERAGES section
+// includes ✓/✗ hit/miss indicators per metric.
+func EmitTextReport(w io.Writer, logs []*api.DayLog, targets *config.Targets) error {
 	if len(logs) == 0 {
 		fmt.Fprintln(w, "No data.")
 		return nil
@@ -58,9 +61,18 @@ func EmitTextReport(w io.Writer, logs []*api.DayLog) error {
 	macros := api.AvgMacroBreakdown(logs)
 	if macros.ProteinG+macros.CarbsG+macros.FatG > 0 {
 		fmt.Fprintf(w, "\nMACRO DISTRIBUTION  (average daily)\n")
-		fmt.Fprintf(w, "  %-14s  %5.1f%%  %6.0fg avg\n", "Protein", macros.ProteinPct, macros.ProteinG)
-		fmt.Fprintf(w, "  %-14s  %5.1f%%  %6.0fg avg\n", "Carbohydrates", macros.CarbsPct, macros.CarbsG)
-		fmt.Fprintf(w, "  %-14s  %5.1f%%  %6.0fg avg\n", "Fat", macros.FatPct, macros.FatG)
+		if targets != nil && targets.HasAny() {
+			proteinMark, proteinRef := hitMarkRange(macros.ProteinG, targets.ProteinG)
+			carbsMark, carbsRef := hitMarkRange(macros.CarbsG, targets.CarbsG)
+			fatMark, fatRef := hitMarkRange(macros.FatG, targets.FatG)
+			fmt.Fprintf(w, "  %-14s  %5.1f%%  %6.0fg avg  %s%s\n", "Protein", macros.ProteinPct, macros.ProteinG, proteinRef, proteinMark)
+			fmt.Fprintf(w, "  %-14s  %5.1f%%  %6.0fg avg  %s%s\n", "Carbohydrates", macros.CarbsPct, macros.CarbsG, carbsRef, carbsMark)
+			fmt.Fprintf(w, "  %-14s  %5.1f%%  %6.0fg avg  %s%s\n", "Fat", macros.FatPct, macros.FatG, fatRef, fatMark)
+		} else {
+			fmt.Fprintf(w, "  %-14s  %5.1f%%  %6.0fg avg\n", "Protein", macros.ProteinPct, macros.ProteinG)
+			fmt.Fprintf(w, "  %-14s  %5.1f%%  %6.0fg avg\n", "Carbohydrates", macros.CarbsPct, macros.CarbsG)
+			fmt.Fprintf(w, "  %-14s  %5.1f%%  %6.0fg avg\n", "Fat", macros.FatPct, macros.FatG)
+		}
 		if macros.AlcoholG > 0 {
 			fmt.Fprintf(w, "  %-14s  %5.1f%%  %6.0fg avg\n", "Alcohol", macros.AlcoholPct, macros.AlcoholG)
 		}
@@ -80,16 +92,33 @@ func EmitTextReport(w io.Writer, logs []*api.DayLog) error {
 	}
 	if daysWithData > 0 {
 		n := float64(daysWithData)
+		avgFiber := fiberSum / n
+		avgSodium := sodiumSum / n
+		avgAddedSugar := addedSugarSum / n
+
 		fmtMicro := func(v float64) string {
 			if v == 0 {
 				return "—"
 			}
 			return fmt.Sprintf("%.0f", v)
 		}
+
 		fmt.Fprintf(w, "\nDAILY AVERAGES (additional)\n")
-		fmt.Fprintf(w, "  %-14s  %s g avg   (ref ≥%.0fg)\n", "Fiber", fmtMicro(fiberSum/n), 28.0)
-		fmt.Fprintf(w, "  %-14s  %s mg avg  (ref ≤%.0fmg)\n", "Sodium", fmtMicro(sodiumSum/n), 2300.0)
-		fmt.Fprintf(w, "  %-14s  %s g avg   (ref ≤%.0fg)\n", "Added Sugar", fmtMicro(addedSugarSum/n), 35.0)
+
+		if targets != nil && targets.HasAny() {
+			// With configured targets: show target and hit/miss indicator.
+			fiberMark, fiberRef := hitMarkFloor(avgFiber, targets.FiberGMin, 28.0)
+			sodiumMark, sodiumRef := hitMarkCeil(avgSodium, targets.SodiumMgMax, 2300.0)
+			addedSugarMark, addedSugarRef := hitMarkCeil(avgAddedSugar, targets.AddedSugarGMax, 35.0)
+			fmt.Fprintf(w, "  %-14s  %s g avg   target ≥%.0fg   %s\n", "Fiber", fmtMicro(avgFiber), fiberRef, fiberMark)
+			fmt.Fprintf(w, "  %-14s  %s mg avg  target ≤%.0fmg  %s\n", "Sodium", fmtMicro(avgSodium), sodiumRef, sodiumMark)
+			fmt.Fprintf(w, "  %-14s  %s g avg   target ≤%.0fg   %s\n", "Added Sugar", fmtMicro(avgAddedSugar), addedSugarRef, addedSugarMark)
+		} else {
+			// No configured targets: show generic reference values.
+			fmt.Fprintf(w, "  %-14s  %s g avg   (ref ≥%.0fg)\n", "Fiber", fmtMicro(avgFiber), 28.0)
+			fmt.Fprintf(w, "  %-14s  %s mg avg  (ref ≤%.0fmg)\n", "Sodium", fmtMicro(avgSodium), 2300.0)
+			fmt.Fprintf(w, "  %-14s  %s g avg   (ref ≤%.0fg)\n", "Added Sugar", fmtMicro(avgAddedSugar), 35.0)
+		}
 	}
 
 	// Top foods by points
@@ -128,6 +157,45 @@ func truncateStr(s string, max int) string {
 		return s
 	}
 	return string(r[:max-1]) + "…"
+}
+
+// hitMarkFloor returns a ✓/✗ indicator and the effective floor value.
+// When configured is 0, falls back to fallback.
+func hitMarkFloor(avg, configured, fallback float64) (mark string, ref float64) {
+	ref = fallback
+	if configured > 0 {
+		ref = configured
+	}
+	if avg >= ref {
+		return "✓", ref
+	}
+	return "✗", ref
+}
+
+// hitMarkCeil returns a ✓/✗ indicator and the effective ceiling value.
+// When configured is 0, falls back to fallback.
+func hitMarkCeil(avg, configured, fallback float64) (mark string, ref float64) {
+	ref = fallback
+	if configured > 0 {
+		ref = configured
+	}
+	if avg <= ref {
+		return "✓", ref
+	}
+	return "✗", ref
+}
+
+// hitMarkRange returns a ✓/✗ indicator and a formatted target string for a range band.
+// Returns empty strings when band is unconfigured (len < 2).
+func hitMarkRange(avg float64, band []float64) (mark, ref string) {
+	if len(band) < 2 {
+		return "", ""
+	}
+	ref = fmt.Sprintf("target %.0f–%.0fg  ", band[0], band[1])
+	if avg >= band[0] {
+		return "✓", ref
+	}
+	return "✗", ref
 }
 
 func zeroPointList(logs []*api.DayLog) []api.FoodStat {

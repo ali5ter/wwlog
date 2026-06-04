@@ -9,13 +9,39 @@ import (
 	"github.com/spf13/viper"
 )
 
+// Targets holds optional user-configured nutrition and points reference values.
+// All fields are optional; when absent the TUI and reports fall back to generic
+// reference daily values. Configure in ~/.config/wwlog/config.toml under [targets].
+//
+// Range bands ([min, max]) render as a target window on bars and in reports.
+// Single _min values are floors (more is fine); single _max values are ceilings (less is better).
+type Targets struct {
+	Calories       []float64 `mapstructure:"calories"`          // [min, max] kcal/day band
+	ProteinG       []float64 `mapstructure:"protein_g"`         // [min, max] g/day
+	CarbsG         []float64 `mapstructure:"carbs_g"`           // [min, max] g/day
+	FatG           []float64 `mapstructure:"fat_g"`             // [min, max] g/day
+	FiberGMin      float64   `mapstructure:"fiber_g_min"`       // floor g/day
+	SodiumMgMax    float64   `mapstructure:"sodium_mg_max"`     // ceiling mg/day
+	AddedSugarGMax float64   `mapstructure:"added_sugar_g_max"` // ceiling g/day
+	PointsDaily    float64   `mapstructure:"points_daily"`      // override WW daily target
+}
+
+// HasAny reports whether any nutrition target is configured.
+func (t *Targets) HasAny() bool {
+	if t == nil {
+		return false
+	}
+	return len(t.Calories) > 0 || len(t.ProteinG) > 0 || len(t.CarbsG) > 0 ||
+		len(t.FatG) > 0 || t.FiberGMin > 0 || t.SodiumMgMax > 0 ||
+		t.AddedSugarGMax > 0 || t.PointsDaily > 0
+}
+
 // Config holds user-configurable settings.
 type Config struct {
-	TLD        string `mapstructure:"tld"`
-	Theme      string `mapstructure:"theme"`
-	CacheTTL   int    `mapstructure:"cache_ttl"`
-	WeightUnit string `mapstructure:"weight_unit"`
-	StoreDir   string `mapstructure:"store_dir"`
+	TLD        string  `mapstructure:"tld"`
+	WeightUnit string  `mapstructure:"weight_unit"`
+	StoreDir   string  `mapstructure:"store_dir"`
+	Targets    Targets `mapstructure:"targets"`
 }
 
 // DefaultStoreDir returns the platform default location for the local day-log
@@ -51,8 +77,6 @@ func Load() (*Config, error) {
 	}
 
 	v.SetDefault("tld", "com")
-	v.SetDefault("theme", "auto")
-	v.SetDefault("cache_ttl", 3600)
 	v.SetDefault("weight_unit", "")
 	v.SetDefault("store_dir", "")
 
@@ -78,5 +102,5 @@ func Load() (*Config, error) {
 }
 
 func defaults() *Config {
-	return &Config{TLD: "com", Theme: "auto", CacheTTL: 3600}
+	return &Config{TLD: "com"}
 }

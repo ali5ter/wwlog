@@ -16,10 +16,11 @@ import (
 	"github.com/NimbleMarkets/ntcharts/v2/canvas"
 	"github.com/NimbleMarkets/ntcharts/v2/canvas/runes"
 	"github.com/NimbleMarkets/ntcharts/v2/linechart"
+	"github.com/ali5ter/wwlog/config"
 	"github.com/ali5ter/wwlog/internal/api"
 )
 
-// rdv holds reference daily values used as bar maximums.
+// rdv holds reference daily values used as bar maximums when no user targets are configured.
 var rdv = &api.DayNutrition{
 	Calories:     2000,
 	Fat:          65,
@@ -31,6 +32,62 @@ var rdv = &api.DayNutrition{
 	AddedSugar:   35,
 	Protein:      50,
 	Alcohol:      28,
+}
+
+// nutriRef holds bar rendering parameters for a single nutrient.
+type nutriRef struct {
+	value float64 // 100% mark on the bar
+	clamp bool    // true: bar caps at 100% (floor target — more is fine); false: bar turns purple if over (ceiling)
+}
+
+// resolveRef returns the bar reference for a named nutrient, using user targets when configured
+// and falling back to generic RDV values otherwise.
+func resolveRef(targets *config.Targets, metric string) nutriRef {
+	if targets != nil {
+		switch metric {
+		case "calories":
+			if len(targets.Calories) >= 2 {
+				return nutriRef{targets.Calories[1], false}
+			}
+		case "protein":
+			if len(targets.ProteinG) >= 2 {
+				return nutriRef{targets.ProteinG[1], false}
+			}
+		case "carbs":
+			if len(targets.CarbsG) >= 2 {
+				return nutriRef{targets.CarbsG[1], false}
+			}
+		case "fat":
+			if len(targets.FatG) >= 2 {
+				return nutriRef{targets.FatG[1], false}
+			}
+		case "fiber":
+			if targets.FiberGMin > 0 {
+				return nutriRef{targets.FiberGMin, true}
+			}
+		case "sodium":
+			if targets.SodiumMgMax > 0 {
+				return nutriRef{targets.SodiumMgMax, false}
+			}
+		case "added_sugar":
+			if targets.AddedSugarGMax > 0 {
+				return nutriRef{targets.AddedSugarGMax, false}
+			}
+		}
+	}
+	switch metric {
+	case "calories":    return nutriRef{rdv.Calories, false}
+	case "protein":     return nutriRef{rdv.Protein, false}
+	case "carbs":       return nutriRef{rdv.Carbs, false}
+	case "fat":         return nutriRef{rdv.Fat, false}
+	case "sat_fat":     return nutriRef{rdv.SaturatedFat, false}
+	case "fiber":       return nutriRef{rdv.Fiber, false}
+	case "sodium":      return nutriRef{rdv.Sodium, false}
+	case "sugar":       return nutriRef{rdv.Sugar, false}
+	case "added_sugar": return nutriRef{rdv.AddedSugar, false}
+	case "alcohol":     return nutriRef{rdv.Alcohol, false}
+	}
+	return nutriRef{1, false}
 }
 
 type nutriModel struct {
@@ -47,10 +104,11 @@ type nutriModel struct {
 	height      int
 	selected    int
 	locale      locale
+	targets     *config.Targets
 	initialized bool
 }
 
-func newNutriModel(logs []*api.DayLog, data map[string]*api.DayNutrition, width, height int, loc locale) nutriModel {
+func newNutriModel(logs []*api.DayLog, data map[string]*api.DayNutrition, width, height int, loc locale, targets *config.Targets) nutriModel {
 	listWidth := width / 3
 	listHeight := height - 2
 
@@ -84,6 +142,7 @@ func newNutriModel(logs []*api.DayLog, data map[string]*api.DayNutrition, width,
 		width:       width,
 		height:      height,
 		locale:      loc,
+		targets:     targets,
 		initialized: true,
 	}
 	m.detail.SetContent(m.renderDetail())
@@ -292,27 +351,31 @@ func (m *nutriModel) renderDetail() string {
 
 	fmt.Fprintf(&b, "%s\n\n", styleDim.Render(strings.Repeat("─", sepWidth)))
 
-	// Nutrition bars vs recommended daily values.
-	fmt.Fprintf(&b, "%s\n\n", styleDetailLabel.Render("Nutrition  (bars show % of daily reference)"))
-	writeNutriBar(&b, "Calories", "kcal", dn.Calories, rdv.Calories, m.avgs.Calories, barWidth)
-	writeNutriBar(&b, "Protein", "g", dn.Protein, rdv.Protein, m.avgs.Protein, barWidth)
-	writeNutriBar(&b, "Carbs", "g", dn.Carbs, rdv.Carbs, m.avgs.Carbs, barWidth)
-	writeNutriBar(&b, "Fat", "g", dn.Fat, rdv.Fat, m.avgs.Fat, barWidth)
-	writeNutriBar(&b, "Sat Fat", "g", dn.SaturatedFat, rdv.SaturatedFat, m.avgs.SaturatedFat, barWidth)
-	writeNutriBar(&b, "Fiber", "g", dn.Fiber, rdv.Fiber, m.avgs.Fiber, barWidth)
-	writeNutriBar(&b, "Sodium", "mg", dn.Sodium, rdv.Sodium, m.avgs.Sodium, barWidth)
-	writeNutriBar(&b, "Sugar", "g", dn.Sugar, rdv.Sugar, m.avgs.Sugar, barWidth)
+	// Nutrition bars vs configured targets (or generic RDV when no targets set).
+	refLabel := "bars show % of daily reference"
+	if m.targets != nil && m.targets.HasAny() {
+		refLabel = "bars show % of configured target"
+	}
+	fmt.Fprintf(&b, "%s\n\n", styleDetailLabel.Render("Nutrition  ("+refLabel+")"))
+	writeNutriBar(&b, "Calories", "kcal", dn.Calories, resolveRef(m.targets, "calories"), m.avgs.Calories, barWidth)
+	writeNutriBar(&b, "Protein", "g", dn.Protein, resolveRef(m.targets, "protein"), m.avgs.Protein, barWidth)
+	writeNutriBar(&b, "Carbs", "g", dn.Carbs, resolveRef(m.targets, "carbs"), m.avgs.Carbs, barWidth)
+	writeNutriBar(&b, "Fat", "g", dn.Fat, resolveRef(m.targets, "fat"), m.avgs.Fat, barWidth)
+	writeNutriBar(&b, "Sat Fat", "g", dn.SaturatedFat, resolveRef(m.targets, "sat_fat"), m.avgs.SaturatedFat, barWidth)
+	writeNutriBar(&b, "Fiber", "g", dn.Fiber, resolveRef(m.targets, "fiber"), m.avgs.Fiber, barWidth)
+	writeNutriBar(&b, "Sodium", "mg", dn.Sodium, resolveRef(m.targets, "sodium"), m.avgs.Sodium, barWidth)
+	writeNutriBar(&b, "Sugar", "g", dn.Sugar, resolveRef(m.targets, "sugar"), m.avgs.Sugar, barWidth)
 	if dn.AddedSugar > 0 || m.avgs.AddedSugar > 0 {
-		writeNutriBar(&b, "Added Sugar", "g", dn.AddedSugar, rdv.AddedSugar, m.avgs.AddedSugar, barWidth)
+		writeNutriBar(&b, "Added Sugar", "g", dn.AddedSugar, resolveRef(m.targets, "added_sugar"), m.avgs.AddedSugar, barWidth)
 	}
 	if dn.Alcohol > 0 || m.avgs.Alcohol > 0 {
-		writeNutriBar(&b, "Alcohol", "g", dn.Alcohol, rdv.Alcohol, m.avgs.Alcohol, barWidth)
+		writeNutriBar(&b, "Alcohol", "g", dn.Alcohol, resolveRef(m.targets, "alcohol"), m.avgs.Alcohol, barWidth)
 	}
 
 	if len(m.logs) > 1 {
 		fmt.Fprintf(&b, "\n%s\n\n", styleDim.Render(strings.Repeat("─", sepWidth)))
 		fmt.Fprintf(&b, "%s\n\n", styleDetailLabel.Render("Trends across date range"))
-		writeTrendTable(&b, m.logs, m.data, vw)
+		writeTrendTable(&b, m.logs, m.data, vw, m.targets)
 	}
 
 	return b.String()
@@ -328,15 +391,15 @@ func (m *nutriModel) nutriSeries(fn func(*api.DayNutrition) float64) []float64 {
 	return vals
 }
 
-func writeNutriBar(b *strings.Builder, label, unit string, value, max, avg float64, barWidth int) {
-	bar := makeBar(value, max, barWidth)
+func writeNutriBar(b *strings.Builder, label, unit string, value float64, ref nutriRef, avg float64, barWidth int) {
+	bar := makeBar(value, ref.value, barWidth, ref.clamp)
 	labelCol := lipgloss.NewStyle().Width(11).Render(styleDetailLabel.Render(label))
 	valCol := lipgloss.NewStyle().Width(14).Render(styleDetailValue.Render(fmt.Sprintf("%s %s", formatNutriValue(value), unit)))
 	avgCol := styleFoodPortion.Render(fmt.Sprintf("avg %s", formatNutriValue(avg)))
 	fmt.Fprintf(b, "  %s%s%s  %s\n", labelCol, valCol, bar, avgCol)
 }
 
-func writeTrendTable(b *strings.Builder, logs []*api.DayLog, data map[string]*api.DayNutrition, vw int) {
+func writeTrendTable(b *strings.Builder, logs []*api.DayLog, data map[string]*api.DayNutrition, vw int, targets *config.Targets) {
 	type series struct {
 		label string
 		unit  string
@@ -344,10 +407,10 @@ func writeTrendTable(b *strings.Builder, logs []*api.DayLog, data map[string]*ap
 		ref   float64 // reference daily value drawn as a threshold line
 	}
 	metrics := []series{
-		{"Calories", "kcal", func(d *api.DayNutrition) float64 { return d.Calories }, rdv.Calories},
-		{"Protein", "g", func(d *api.DayNutrition) float64 { return d.Protein }, rdv.Protein},
-		{"Carbs", "g", func(d *api.DayNutrition) float64 { return d.Carbs }, rdv.Carbs},
-		{"Fat", "g", func(d *api.DayNutrition) float64 { return d.Fat }, rdv.Fat},
+		{"Calories", "kcal", func(d *api.DayNutrition) float64 { return d.Calories }, resolveRef(targets, "calories").value},
+		{"Protein", "g", func(d *api.DayNutrition) float64 { return d.Protein }, resolveRef(targets, "protein").value},
+		{"Carbs", "g", func(d *api.DayNutrition) float64 { return d.Carbs }, resolveRef(targets, "carbs").value},
+		{"Fat", "g", func(d *api.DayNutrition) float64 { return d.Fat }, resolveRef(targets, "fat").value},
 	}
 
 	n := len(logs)
@@ -472,7 +535,7 @@ func clampOutliers(vals []float64) []float64 {
 // of a single full block.
 var subcellBlocks = [9]rune{' ', '▏', '▎', '▍', '▌', '▋', '▊', '▉', '█'}
 
-func makeBar(value, max float64, width int) string {
+func makeBar(value, max float64, width int, clamp bool) string {
 	if width == 0 {
 		return ""
 	}
@@ -488,7 +551,7 @@ func makeBar(value, max float64, width int) string {
 	rem := eighths % 8
 
 	barColor := color.Color(colorTeal)
-	if max > 0 && value > max {
+	if !clamp && max > 0 && value > max {
 		barColor = colorPurple
 	}
 

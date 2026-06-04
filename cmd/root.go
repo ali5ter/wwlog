@@ -211,7 +211,7 @@ func run(cmd *cobra.Command, _ []string) error {
 		case "markdown":
 			err = pipeline.EmitMarkdown(f, logs)
 		case "report":
-			err = pipeline.EmitTextReport(f, logs)
+			err = pipeline.EmitTextReport(f, logs, &cfg.Targets)
 		}
 		if err != nil {
 			return fmt.Errorf("write %s: %w", dest, err)
@@ -246,13 +246,13 @@ func run(cmd *cobra.Command, _ []string) error {
 			return err
 		}
 		if flagReport {
-			return pipeline.EmitTextReport(os.Stdout, logs)
+			return pipeline.EmitTextReport(os.Stdout, logs, &cfg.Targets)
 		}
 		return pipeline.EmitJSON(logs)
 	}
 
 	// TUI mode: auth and date range handled inside the TUI.
-	return tui.Run(authenticator, tld, cfg.WeightUnit, ds, flagStart, flagEnd, version)
+	return tui.Run(authenticator, tld, cfg.WeightUnit, ds, &cfg.Targets, flagStart, flagEnd, version)
 }
 
 func readPassword() (string, error) {

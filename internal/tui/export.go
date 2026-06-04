@@ -8,6 +8,7 @@ import (
 
 	tea "charm.land/bubbletea/v2"
 	"charm.land/huh/v2"
+	"github.com/ali5ter/wwlog/config"
 	"github.com/ali5ter/wwlog/internal/api"
 	"github.com/ali5ter/wwlog/internal/pipeline"
 )
@@ -93,7 +94,7 @@ func (m exportModel) view() string {
 	return renderDialog("Export your log", m.form.View(), "esc cancel · enter submit · tab next field")
 }
 
-func runExport(format, dir, start, end string, logs []*api.DayLog) tea.Cmd {
+func runExport(format, dir, start, end string, logs []*api.DayLog, targets *config.Targets) tea.Cmd {
 	return func() tea.Msg {
 		ext := format
 		if ext == "report" {
@@ -109,7 +110,7 @@ func runExport(format, dir, start, end string, logs []*api.DayLog) tea.Cmd {
 
 		switch format {
 		case "report":
-			err = pipeline.EmitTextReport(f, logs)
+			err = pipeline.EmitTextReport(f, logs, targets)
 		case "json":
 			err = pipeline.WriteJSON(f, logs)
 		case "md":

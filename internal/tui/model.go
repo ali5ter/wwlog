@@ -9,6 +9,7 @@ import (
 	tea "charm.land/bubbletea/v2"
 	"charm.land/huh/v2"
 	"charm.land/lipgloss/v2"
+	"github.com/ali5ter/wwlog/config"
 	"github.com/ali5ter/wwlog/internal/api"
 	"github.com/ali5ter/wwlog/internal/auth"
 )
@@ -79,10 +80,11 @@ type Model struct {
 	latestVersion  string
 	client         *api.Client
 	statusMsg      string
+	targets        *config.Targets
 }
 
 // Run initialises and starts the TUI, blocking until the user quits.
-func Run(authObj *auth.Auth, tld, weightUnit string, ds api.DayStore, preStart, preEnd string, version string) error {
+func Run(authObj *auth.Auth, tld, weightUnit string, ds api.DayStore, targets *config.Targets, preStart, preEnd string, version string) error {
 	s := spinner.New()
 	s.Spinner = spinner.Points
 	s.Style = lipgloss.NewStyle().Foreground(colorTeal)
@@ -96,6 +98,7 @@ func Run(authObj *auth.Auth, tld, weightUnit string, ds api.DayStore, preStart, 
 		weightUnit:    weightUnit,
 		ds:            ds,
 		version:       version,
+		targets:       targets,
 	}
 
 	p := tea.NewProgram(m)
@@ -164,7 +167,7 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		nutrition := api.ComputeAllNutrition(m.logs)
 		loc := newLocale(m.tld, m.weightUnit)
 		m.logModel = newLogModel(m.logs, m.width, m.contentHeight(), loc)
-		m.nutriModel = newNutriModel(m.logs, nutrition, m.width, m.contentHeight(), loc)
+		m.nutriModel = newNutriModel(m.logs, nutrition, m.width, m.contentHeight(), loc, m.targets)
 		m.insightsModel = newInsightsModel(m.logs, m.width, m.contentHeight())
 		return m, nil
 
@@ -225,7 +228,7 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 				dir := m.exportModel.form.GetString("dir")
 				m.dialog = dialogNone
 				m.statusMsg = styleFoodPortion.Render("  Saving…")
-				return m, runExport(format, dir, m.start, m.end, m.logs)
+				return m, runExport(format, dir, m.start, m.end, m.logs, m.targets)
 			}
 			if m.exportModel.form.State == huh.StateAborted {
 				m.dialog = dialogNone
@@ -317,7 +320,7 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			dir := m.exportModel.form.GetString("dir")
 			m.dialog = dialogNone
 			m.statusMsg = styleFoodPortion.Render("  Saving…")
-			return m, runExport(format, dir, m.start, m.end, m.logs)
+			return m, runExport(format, dir, m.start, m.end, m.logs, m.targets)
 		}
 		return m, cmd
 	}
