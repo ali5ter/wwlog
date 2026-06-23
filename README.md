@@ -302,17 +302,20 @@ calories          = [1700, 1900]   # [min, max] kcal/day band
 protein_g         = [130, 150]     # [min, max] g/day
 carbs_g           = [158, 228]     # [min, max] g/day
 fat_g             = [31, 54]       # [min, max] g/day
-fiber_g_min       = 26             # floor g/day (more is fine)
-sodium_mg_max     = 2300           # ceiling mg/day
-added_sugar_g_max = 35             # ceiling g/day
-points_daily      = 23             # override WW daily points target
+fiber_g_min        = 26    # floor g/day (more is fine)
+sodium_mg_max      = 2300  # ceiling mg/day
+added_sugar_g_max  = 35    # ceiling g/day
+points_daily       = 23    # override WW daily points target
+water_fl_oz_target = 64    # floor fl oz/day (default: 64 — WW's 8-glass suggestion)
 ```
 
 Range bands (`[min, max]`) mark the 100% bar level at the upper bound; the bar turns
 purple only when you exceed that ceiling. Floor targets (`_min`) clamp the bar at 100%
-once the floor is met — being over is fine. When no `[targets]` section is present,
-the Nutrition tab falls back to generic 2000 kcal / RDV references and the `--report`
-shows the same generic reference values without hit/miss indicators.
+once the floor is met — being over is fine. `water_fl_oz_target` sets the daily water
+floor shown in `--report` and the Log tab water bar (default 64 fl oz / 8 glasses).
+When no `[targets]` section is present, the Nutrition tab falls back to generic 2000 kcal
+/ RDV references and `--report` shows the same generic reference values without hit/miss
+indicators.
 
 ## Credits
 
