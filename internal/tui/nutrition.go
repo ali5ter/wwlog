@@ -347,7 +347,7 @@ func (m *nutriModel) renderDetail() string {
 	fmt.Fprintf(&b, "%s\n\n", styleDim.Render(strings.Repeat("─", sepWidth)))
 
 	// Points summary.
-	renderPointsSummary(&b, day.Points, vw, m.locale)
+	renderPointsSummary(&b, day, vw, m.locale)
 
 	fmt.Fprintf(&b, "%s\n\n", styleDim.Render(strings.Repeat("─", sepWidth)))
 

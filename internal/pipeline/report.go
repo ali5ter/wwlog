@@ -78,7 +78,7 @@ func EmitTextReport(w io.Writer, logs []*api.DayLog, targets *config.Targets) er
 		}
 	}
 
-	// Daily averages — fiber, sodium, added sugar
+	// Daily averages — fiber, sodium, added sugar, water
 	nutrition := api.ComputeAllNutrition(logs)
 	var fiberSum, sodiumSum, addedSugarSum float64
 	daysWithData := 0
@@ -90,12 +90,15 @@ func EmitTextReport(w io.Writer, logs []*api.DayLog, targets *config.Targets) er
 			daysWithData++
 		}
 	}
-	if daysWithData > 0 {
-		n := float64(daysWithData)
-		avgFiber := fiberSum / n
-		avgSodium := sodiumSum / n
-		avgAddedSugar := addedSugarSum / n
-
+	var waterSum float64
+	var waterDays int
+	for _, day := range logs {
+		if day.Water != nil {
+			waterSum += day.Water.FlOz
+			waterDays++
+		}
+	}
+	if daysWithData > 0 || waterDays > 0 {
 		fmtMicro := func(v float64) string {
 			if v == 0 {
 				return "—"
@@ -105,19 +108,37 @@ func EmitTextReport(w io.Writer, logs []*api.DayLog, targets *config.Targets) er
 
 		fmt.Fprintf(w, "\nDAILY AVERAGES (additional)\n")
 
-		if targets != nil && targets.HasAny() {
-			// With configured targets: show target and hit/miss indicator.
-			fiberMark, fiberRef := hitMarkFloor(avgFiber, targets.FiberGMin, 28.0)
-			sodiumMark, sodiumRef := hitMarkCeil(avgSodium, targets.SodiumMgMax, 2300.0)
-			addedSugarMark, addedSugarRef := hitMarkCeil(avgAddedSugar, targets.AddedSugarGMax, 35.0)
-			fmt.Fprintf(w, "  %-14s  %s g avg   target ≥%.0fg   %s\n", "Fiber", fmtMicro(avgFiber), fiberRef, fiberMark)
-			fmt.Fprintf(w, "  %-14s  %s mg avg  target ≤%.0fmg  %s\n", "Sodium", fmtMicro(avgSodium), sodiumRef, sodiumMark)
-			fmt.Fprintf(w, "  %-14s  %s g avg   target ≤%.0fg   %s\n", "Added Sugar", fmtMicro(avgAddedSugar), addedSugarRef, addedSugarMark)
-		} else {
-			// No configured targets: show generic reference values.
-			fmt.Fprintf(w, "  %-14s  %s g avg   (ref ≥%.0fg)\n", "Fiber", fmtMicro(avgFiber), 28.0)
-			fmt.Fprintf(w, "  %-14s  %s mg avg  (ref ≤%.0fmg)\n", "Sodium", fmtMicro(avgSodium), 2300.0)
-			fmt.Fprintf(w, "  %-14s  %s g avg   (ref ≤%.0fg)\n", "Added Sugar", fmtMicro(avgAddedSugar), 35.0)
+		if daysWithData > 0 {
+			n := float64(daysWithData)
+			avgFiber := fiberSum / n
+			avgSodium := sodiumSum / n
+			avgAddedSugar := addedSugarSum / n
+
+			if targets != nil && targets.HasAny() {
+				fiberMark, fiberRef := hitMarkFloor(avgFiber, targets.FiberGMin, 28.0)
+				sodiumMark, sodiumRef := hitMarkCeil(avgSodium, targets.SodiumMgMax, 2300.0)
+				addedSugarMark, addedSugarRef := hitMarkCeil(avgAddedSugar, targets.AddedSugarGMax, 35.0)
+				fmt.Fprintf(w, "  %-14s  %s g avg   target ≥%.0fg   %s\n", "Fiber", fmtMicro(avgFiber), fiberRef, fiberMark)
+				fmt.Fprintf(w, "  %-14s  %s mg avg  target ≤%.0fmg  %s\n", "Sodium", fmtMicro(avgSodium), sodiumRef, sodiumMark)
+				fmt.Fprintf(w, "  %-14s  %s g avg   target ≤%.0fg   %s\n", "Added Sugar", fmtMicro(avgAddedSugar), addedSugarRef, addedSugarMark)
+			} else {
+				fmt.Fprintf(w, "  %-14s  %s g avg   (ref ≥%.0fg)\n", "Fiber", fmtMicro(avgFiber), 28.0)
+				fmt.Fprintf(w, "  %-14s  %s mg avg  (ref ≤%.0fmg)\n", "Sodium", fmtMicro(avgSodium), 2300.0)
+				fmt.Fprintf(w, "  %-14s  %s g avg   (ref ≤%.0fg)\n", "Added Sugar", fmtMicro(avgAddedSugar), 35.0)
+			}
+		}
+
+		if waterDays > 0 {
+			avgWater := waterSum / float64(waterDays)
+			waterTarget := targets.WaterTarget()
+			waterMark, waterRef := hitMarkFloor(avgWater, waterTarget, 64.0)
+			if targets != nil && targets.HasAny() {
+				fmt.Fprintf(w, "  %-14s  %s fl oz avg  target ≥%.0f fl oz  %s\n",
+					"Water", fmtMicro(avgWater), waterRef, waterMark)
+			} else {
+				fmt.Fprintf(w, "  %-14s  %s fl oz avg  (ref ≥%.0f fl oz)\n",
+					"Water", fmtMicro(avgWater), waterRef)
+			}
 		}
 	}
 

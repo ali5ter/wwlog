@@ -65,6 +65,8 @@ func WriteLogCSV(w io.Writer, logs []*api.DayLog) error {
 func EmitMarkdown(w io.Writer, logs []*api.DayLog) error {
 	nutrition := api.ComputeAllNutrition(logs)
 	fmt.Fprintf(w, "# Food Log\n\n")
+	var waterSum float64
+	var waterDays int
 	for _, day := range logs {
 		fmt.Fprintf(w, "## %s\n\n", day.Date)
 		p := day.Points
@@ -86,10 +88,19 @@ func EmitMarkdown(w io.Writer, logs []*api.DayLog) error {
 			}
 			fmt.Fprintf(w, "\n\n")
 		}
+		if day.Water != nil {
+			fmt.Fprintf(w, "**Water:** %.0f fl oz (%d glasses)\n\n", day.Water.FlOz, day.Water.Glasses)
+			waterSum += day.Water.FlOz
+			waterDays++
+		}
 		writeMealMD(w, "Breakfast", day.Meals.Morning)
 		writeMealMD(w, "Lunch", day.Meals.Midday)
 		writeMealMD(w, "Dinner", day.Meals.Evening)
 		writeMealMD(w, "Snacks", day.Meals.Anytime)
+	}
+	if waterDays > 1 {
+		fmt.Fprintf(w, "---\n\n**Water average:** %.0f fl oz/day (%.1f glasses/day) over %d days\n",
+			waterSum/float64(waterDays), waterSum/float64(waterDays)/8, waterDays)
 	}
 	return nil
 }

@@ -228,5 +228,19 @@ func LoadRange(client *Client, ds DayStore, start, end string, offline bool) ([]
 		))
 	}
 
+	// Fetch water for the API-accessible range (single call) and attach to each log.
+	// Non-fatal: if the water endpoint fails, water data is simply absent.
+	waterMap, werr := client.FetchWaterRange(apiDates[0], apiDates[len(apiDates)-1])
+	if werr == nil {
+		for _, log := range logs {
+			if w, ok := waterMap[log.Date]; ok {
+				log.Water = w
+				if ds != nil {
+					_ = ds.Save(log)
+				}
+			}
+		}
+	}
+
 	return logs, notices, nil
 }

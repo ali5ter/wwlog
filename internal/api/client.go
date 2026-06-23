@@ -137,6 +137,48 @@ func FetchLatestVersion() string {
 	return strings.TrimPrefix(v.TagName, "v")
 }
 
+// FetchWaterRange returns water intake records for the given date range (inclusive).
+// The returned map is keyed by date string (YYYY-MM-DD); dates with no water logged
+// have no entry. Non-fatal: callers should treat an error as "no water data".
+func (c *Client) FetchWaterRange(start, end string) (map[string]*DayWater, error) {
+	url := fmt.Sprintf(
+		"https://cmx.weightwatchers.%s/api/v1/cmx/members/~/water?startDate=%s&endDate=%s",
+		c.tld, start, end,
+	)
+	resp, err := c.get(url)
+	if err != nil {
+		return nil, fmt.Errorf("fetch water %s–%s: %w", start, end, err)
+	}
+	defer resp.Body.Close()
+	if resp.StatusCode != http.StatusOK {
+		return nil, fmt.Errorf("fetch water %s–%s: server returned %d", start, end, resp.StatusCode)
+	}
+	var raw struct {
+		Results []struct {
+			Date        string  `json:"date"`
+			Amount      float64 `json:"amount"`
+			ServingSize float64 `json:"servingSize"`
+		} `json:"results"`
+	}
+	if err := json.NewDecoder(resp.Body).Decode(&raw); err != nil {
+		return nil, fmt.Errorf("decode water: %w", err)
+	}
+	out := make(map[string]*DayWater, len(raw.Results))
+	for _, r := range raw.Results {
+		serving := r.ServingSize
+		if serving <= 0 {
+			serving = 8
+		}
+		out[r.Date] = &DayWater{
+			Date:        r.Date,
+			Glasses:     int(r.Amount),
+			FlOz:        r.Amount * serving,
+			ServingFlOz: serving,
+		}
+	}
+	return out, nil
+}
+
 // FetchDayRaw returns the raw JSON response body for a single date. Used for
 // API inspection — run with --raw to see all available fields.
 func (c *Client) FetchDayRaw(date string) ([]byte, error) {

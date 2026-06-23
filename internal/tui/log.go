@@ -284,7 +284,8 @@ func (m *logModel) resize(width, height int) {
 	}
 }
 
-func renderPointsSummary(b *strings.Builder, pts api.DayPoints, contentWidth int, loc locale) {
+func renderPointsSummary(b *strings.Builder, day *api.DayLog, contentWidth int, loc locale) {
+	pts := day.Points
 	if pts.DailyTarget == 0 {
 		return
 	}
@@ -314,6 +315,15 @@ func renderPointsSummary(b *strings.Builder, pts api.DayPoints, contentWidth int
 	if len(meta) > 0 {
 		fmt.Fprintf(b, "  %s\n", styleFoodPortion.Render(strings.Join(meta, "  ·  ")))
 	}
+
+	if w := day.Water; w != nil {
+		wLabel := lipgloss.NewStyle().Width(8).Render(styleDetailLabel.Render("Water"))
+		wBar := makeBar(w.FlOz, 128, barWidth, true)
+		wVal := styleDetailValue.Render(fmt.Sprintf("%.0f", w.FlOz))
+		wGlass := styleFoodPortion.Render(fmt.Sprintf(" fl oz  (%d glasses)", w.Glasses))
+		fmt.Fprintf(b, "  %s  %s  %s%s\n", wLabel, wBar, wVal, wGlass)
+	}
+
 	fmt.Fprintln(b)
 }
 
@@ -347,7 +357,7 @@ func renderDay(day *api.DayLog, width int, mode sortMode, loc locale) string {
 	}
 	fmt.Fprintf(&b, "%s\n", styleMealHeading.Render(heading))
 	fmt.Fprintf(&b, "%s\n\n", styleDim.Render(strings.Repeat("─", sepWidth)))
-	renderPointsSummary(&b, day.Points, width, loc)
+	renderPointsSummary(&b, day, width, loc)
 	renderMeal(&b, "☀  Breakfast", sortEntries(day.Meals.Morning, mode))
 	renderMeal(&b, "☁  Lunch", sortEntries(day.Meals.Midday, mode))
 	renderMeal(&b, "☽  Dinner", sortEntries(day.Meals.Evening, mode))

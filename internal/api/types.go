@@ -115,6 +115,18 @@ type DayLog struct {
 	Date   string
 	Meals  Meals
 	Points DayPoints
+	Water  *DayWater // nil when not fetched or no water logged
+}
+
+// DayWater holds water intake logged for a single day via the WW water tracker.
+// Glasses is the number of 8-fl-oz glasses tapped in the app; FlOz is the total
+// volume (Glasses × ServingFlOz). The WW API returns amount as glass count despite
+// the unit field reading "fl oz" — multiply by ServingFlOz to get actual volume.
+type DayWater struct {
+	Date        string  `json:"date"`
+	Glasses     int     `json:"glasses"`
+	FlOz        float64 `json:"fl_oz"`
+	ServingFlOz float64 `json:"serving_fl_oz"`
 }
 
 // AllEntries returns all food entries across all meal periods.

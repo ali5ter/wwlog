@@ -20,10 +20,11 @@ type Targets struct {
 	ProteinG       []float64 `mapstructure:"protein_g"`         // [min, max] g/day
 	CarbsG         []float64 `mapstructure:"carbs_g"`           // [min, max] g/day
 	FatG           []float64 `mapstructure:"fat_g"`             // [min, max] g/day
-	FiberGMin      float64   `mapstructure:"fiber_g_min"`       // floor g/day
-	SodiumMgMax    float64   `mapstructure:"sodium_mg_max"`     // ceiling mg/day
-	AddedSugarGMax float64   `mapstructure:"added_sugar_g_max"` // ceiling g/day
-	PointsDaily    float64   `mapstructure:"points_daily"`      // override WW daily target
+	FiberGMin        float64   `mapstructure:"fiber_g_min"`         // floor g/day
+	SodiumMgMax      float64   `mapstructure:"sodium_mg_max"`       // ceiling mg/day
+	AddedSugarGMax   float64   `mapstructure:"added_sugar_g_max"`   // ceiling g/day
+	PointsDaily      float64   `mapstructure:"points_daily"`        // override WW daily target
+	WaterFlOzTarget  float64   `mapstructure:"water_fl_oz_target"`  // floor fl oz/day (default: 64)
 }
 
 // HasAny reports whether any nutrition target is configured.
@@ -33,7 +34,16 @@ func (t *Targets) HasAny() bool {
 	}
 	return len(t.Calories) > 0 || len(t.ProteinG) > 0 || len(t.CarbsG) > 0 ||
 		len(t.FatG) > 0 || t.FiberGMin > 0 || t.SodiumMgMax > 0 ||
-		t.AddedSugarGMax > 0 || t.PointsDaily > 0
+		t.AddedSugarGMax > 0 || t.PointsDaily > 0 || t.WaterFlOzTarget > 0
+}
+
+// WaterTarget returns the effective daily water target in fl oz.
+// Falls back to 64 fl oz (WW's 8-glass suggestion) when not configured.
+func (t *Targets) WaterTarget() float64 {
+	if t != nil && t.WaterFlOzTarget > 0 {
+		return t.WaterFlOzTarget
+	}
+	return 64
 }
 
 // Config holds user-configurable settings.
