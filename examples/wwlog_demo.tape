@@ -15,7 +15,7 @@ Sleep 200ms
 Show
 
 # Launch the TUI with a week of data
-Type "./wwlog --start 2026-03-30 --end 2026-04-30"
+Type "./wwlog --start 2026-05-23 --end 2026-06-22"
 Sleep 600ms
 Enter
 
@@ -125,7 +125,7 @@ Backspace
 Sleep 100ms
 Backspace
 Sleep 100ms
-Type "04-23" Enter
+Type "06-10" Enter
 Sleep 1s
 Enter
 
