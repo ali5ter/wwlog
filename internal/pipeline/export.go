@@ -25,7 +25,7 @@ func WriteJSON(w io.Writer, logs []*api.DayLog) error {
 // WriteLogCSV writes a CSV of food log entries with points and calories to w.
 func WriteLogCSV(w io.Writer, logs []*api.DayLog) error {
 	cw := csv.NewWriter(w)
-	_ = cw.Write([]string{"Date", "Meal", "Food", "Serving", "Points", "Calories", "Protein (g)", "Carbs (g)", "Fat (g)", "Fiber (g)", "Sodium (mg)", "Added Sugar (g)"})
+	_ = cw.Write([]string{"Date", "Meal", "Food", "Serving", "Points", "Calories", "Protein (g)", "Carbs (g)", "Fat (g)", "Saturated Fat (g)", "Fiber (g)", "Sodium (mg)", "Added Sugar (g)"})
 	for _, day := range logs {
 		for _, m := range []struct {
 			name    string
@@ -50,6 +50,7 @@ func WriteLogCSV(w io.Writer, logs []*api.DayLog) error {
 					fmt.Sprintf("%.1f", n.Protein),
 					fmt.Sprintf("%.1f", n.Carbs),
 					fmt.Sprintf("%.1f", n.Fat),
+					fmt.Sprintf("%.1f", n.SaturatedFat),
 					fmt.Sprintf("%.1f", n.Fiber),
 					fmt.Sprintf("%.1f", n.Sodium),
 					fmt.Sprintf("%.1f", n.AddedSugar),
@@ -77,6 +78,9 @@ func EmitMarkdown(w io.Writer, logs []*api.DayLog) error {
 		if dn, ok := nutrition[day.Date]; ok && dn.ItemCount > 0 {
 			fmt.Fprintf(w, "**Nutrition:** %.0f kcal  ·  protein %.0fg  ·  carbs %.0fg  ·  fat %.0fg",
 				dn.Calories, dn.Protein, dn.Carbs, dn.Fat)
+			if dn.SaturatedFat > 0 {
+				fmt.Fprintf(w, "  ·  sat fat %.0fg", dn.SaturatedFat)
+			}
 			if dn.Fiber > 0 {
 				fmt.Fprintf(w, "  ·  fiber %.0fg", dn.Fiber)
 			}

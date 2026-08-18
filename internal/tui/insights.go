@@ -174,19 +174,20 @@ func (m *insightsModel) render() string {
 
 	// ── Micronutrients ─────────────────────────────────────────────
 	nutrition := api.ComputeAllNutrition(m.logs)
-	var fiberSum, sodiumSum, addedSugarSum float64
+	var fiberSum, sodiumSum, addedSugarSum, saturatedFatSum float64
 	daysWithData := 0
 	for _, dn := range nutrition {
 		if dn.ItemCount > 0 {
 			fiberSum += dn.Fiber
 			sodiumSum += dn.Sodium
 			addedSugarSum += dn.AddedSugar
+			saturatedFatSum += dn.SaturatedFat
 			daysWithData++
 		}
 	}
 	if daysWithData > 0 {
 		n := float64(daysWithData)
-		fmt.Fprintf(&b, "\n%s\n%s\n\n", styleMealHeading.Render("Daily Averages  (fiber · sodium · added sugar)"), sep)
+		fmt.Fprintf(&b, "\n%s\n%s\n\n", styleMealHeading.Render("Daily Averages  (fiber · sodium · added sugar · saturated fat)"), sep)
 		writeMicroBar := func(label, unit string, avg, ref float64) {
 			bar := makeBar(avg, ref, barWidth, false)
 			labelCol := lipgloss.NewStyle().Width(13).Render(styleDetailLabel.Render(label))
@@ -197,6 +198,7 @@ func (m *insightsModel) render() string {
 		writeMicroBar("Fiber", "g", fiberSum/n, rdv.Fiber)
 		writeMicroBar("Sodium", "mg", sodiumSum/n, rdv.Sodium)
 		writeMicroBar("Added Sugar", "g", addedSugarSum/n, rdv.AddedSugar)
+		writeMicroBar("Sat Fat", "g", saturatedFatSum/n, rdv.SaturatedFat)
 	}
 
 	// ── Top Foods by Points ─────────────────────────────────────────
@@ -255,9 +257,9 @@ func renderHeatmap(logs []*api.DayLog, vw int) string {
 	const layout = "2006-01-02"
 
 	type entry struct {
-		ratio            float64
-		hasTarget        bool
-		weeklyExhausted  bool
+		ratio           float64
+		hasTarget       bool
+		weeklyExhausted bool
 	}
 	days := make(map[string]entry, len(logs))
 	for _, log := range logs {
@@ -287,9 +289,9 @@ func renderHeatmap(logs []*api.DayLog, vw int) string {
 	// calendar date — matches api.ClampToWindow's boundary logic.
 	today, _ := time.Parse(layout, time.Now().Format(layout))
 	todayStr := today.Format(layout)
-	todayMon := today.AddDate(0, 0, -((int(today.Weekday())+6)%7))
+	todayMon := today.AddDate(0, 0, -((int(today.Weekday()) + 6) % 7))
 	earliestMon := today.AddDate(0, 0, -api.APIWindowDays)
-	earliestMon = earliestMon.AddDate(0, 0, -((int(earliestMon.Weekday())+6)%7))
+	earliestMon = earliestMon.AddDate(0, 0, -((int(earliestMon.Weekday()) + 6) % 7))
 	nWeeks := int(todayMon.Sub(earliestMon).Hours()/(24*7)) + 1
 
 	var weeks []time.Time

@@ -16,13 +16,14 @@ import (
 // Range bands ([min, max]) render as a target window on bars and in reports.
 // Single _min values are floors (more is fine); single _max values are ceilings (less is better).
 type Targets struct {
-	Calories       []float64 `mapstructure:"calories"`          // [min, max] kcal/day band
-	ProteinG       []float64 `mapstructure:"protein_g"`         // [min, max] g/day
-	CarbsG         []float64 `mapstructure:"carbs_g"`           // [min, max] g/day
-	FatG           []float64 `mapstructure:"fat_g"`             // [min, max] g/day
+	Calories         []float64 `mapstructure:"calories"`            // [min, max] kcal/day band
+	ProteinG         []float64 `mapstructure:"protein_g"`           // [min, max] g/day
+	CarbsG           []float64 `mapstructure:"carbs_g"`             // [min, max] g/day
+	FatG             []float64 `mapstructure:"fat_g"`               // [min, max] g/day
 	FiberGMin        float64   `mapstructure:"fiber_g_min"`         // floor g/day
 	SodiumMgMax      float64   `mapstructure:"sodium_mg_max"`       // ceiling mg/day
 	AddedSugarGMax   float64   `mapstructure:"added_sugar_g_max"`   // ceiling g/day
+	SaturatedFatGMax float64   `mapstructure:"saturated_fat_g_max"` // ceiling g/day
 	PointsDaily      float64   `mapstructure:"points_daily"`        // override WW daily target
 	WaterFlOzTarget  float64   `mapstructure:"water_fl_oz_target"`  // floor fl oz/day (default: 64)
 }
@@ -34,7 +35,7 @@ func (t *Targets) HasAny() bool {
 	}
 	return len(t.Calories) > 0 || len(t.ProteinG) > 0 || len(t.CarbsG) > 0 ||
 		len(t.FatG) > 0 || t.FiberGMin > 0 || t.SodiumMgMax > 0 ||
-		t.AddedSugarGMax > 0 || t.PointsDaily > 0 || t.WaterFlOzTarget > 0
+		t.AddedSugarGMax > 0 || t.SaturatedFatGMax > 0 || t.PointsDaily > 0 || t.WaterFlOzTarget > 0
 }
 
 // WaterTarget returns the effective daily water target in fl oz.

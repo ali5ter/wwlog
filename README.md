@@ -305,6 +305,7 @@ fat_g             = [31, 54]       # [min, max] g/day
 fiber_g_min        = 26    # floor g/day (more is fine)
 sodium_mg_max      = 2300  # ceiling mg/day
 added_sugar_g_max  = 35    # ceiling g/day
+saturated_fat_g_max = 23   # ceiling g/day
 points_daily       = 23    # override WW daily points target
 water_fl_oz_target = 64    # floor fl oz/day (default: 64 — WW's 8-glass suggestion)
 ```

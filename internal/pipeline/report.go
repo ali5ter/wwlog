@@ -80,13 +80,14 @@ func EmitTextReport(w io.Writer, logs []*api.DayLog, targets *config.Targets) er
 
 	// Daily averages — fiber, sodium, added sugar, water
 	nutrition := api.ComputeAllNutrition(logs)
-	var fiberSum, sodiumSum, addedSugarSum float64
+	var fiberSum, sodiumSum, addedSugarSum, saturatedFatSum float64
 	daysWithData := 0
 	for _, dn := range nutrition {
 		if dn.ItemCount > 0 {
 			fiberSum += dn.Fiber
 			sodiumSum += dn.Sodium
 			addedSugarSum += dn.AddedSugar
+			saturatedFatSum += dn.SaturatedFat
 			daysWithData++
 		}
 	}
@@ -113,18 +114,22 @@ func EmitTextReport(w io.Writer, logs []*api.DayLog, targets *config.Targets) er
 			avgFiber := fiberSum / n
 			avgSodium := sodiumSum / n
 			avgAddedSugar := addedSugarSum / n
+			avgSaturatedFat := saturatedFatSum / n
 
 			if targets != nil && targets.HasAny() {
 				fiberMark, fiberRef := hitMarkFloor(avgFiber, targets.FiberGMin, 28.0)
 				sodiumMark, sodiumRef := hitMarkCeil(avgSodium, targets.SodiumMgMax, 2300.0)
 				addedSugarMark, addedSugarRef := hitMarkCeil(avgAddedSugar, targets.AddedSugarGMax, 35.0)
+				saturatedFatMark, saturatedFatRef := hitMarkCeil(avgSaturatedFat, targets.SaturatedFatGMax, 20.0)
 				fmt.Fprintf(w, "  %-14s  %s g avg   target ≥%.0fg   %s\n", "Fiber", fmtMicro(avgFiber), fiberRef, fiberMark)
 				fmt.Fprintf(w, "  %-14s  %s mg avg  target ≤%.0fmg  %s\n", "Sodium", fmtMicro(avgSodium), sodiumRef, sodiumMark)
 				fmt.Fprintf(w, "  %-14s  %s g avg   target ≤%.0fg   %s\n", "Added Sugar", fmtMicro(avgAddedSugar), addedSugarRef, addedSugarMark)
+				fmt.Fprintf(w, "  %-14s  %s g avg   target ≤%.0fg   %s\n", "Saturated Fat", fmtMicro(avgSaturatedFat), saturatedFatRef, saturatedFatMark)
 			} else {
 				fmt.Fprintf(w, "  %-14s  %s g avg   (ref ≥%.0fg)\n", "Fiber", fmtMicro(avgFiber), 28.0)
 				fmt.Fprintf(w, "  %-14s  %s mg avg  (ref ≤%.0fmg)\n", "Sodium", fmtMicro(avgSodium), 2300.0)
 				fmt.Fprintf(w, "  %-14s  %s g avg   (ref ≤%.0fg)\n", "Added Sugar", fmtMicro(avgAddedSugar), 35.0)
+				fmt.Fprintf(w, "  %-14s  %s g avg   (ref ≤%.0fg)\n", "Saturated Fat", fmtMicro(avgSaturatedFat), 20.0)
 			}
 		}
 
