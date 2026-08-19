@@ -31,7 +31,7 @@ Sleep 300ms
 Enter
 
 # Loading 30 days from the API
-Sleep 12s
+Sleep 4s
 
 # ── Log tab ──────────────────────────────────────────────────
 Sleep 800ms
@@ -156,12 +156,8 @@ Sleep 800ms
 Enter
 
 # Loading 6 days from the API
-Sleep 7s
+Sleep 2s
 
 # Review & quit
-Tab
-Sleep 800ms
-Tab
-Sleep 800ms
 Type "q"
 Sleep 1s
