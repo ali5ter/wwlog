@@ -259,8 +259,9 @@ wwlog --offline --start 2026-04-20 --end 2026-04-26 --json | jq '...'
 
 | Key | Action |
 |-----|--------|
-| `↑` / `↓` or `k` / `j` | Navigate dates |
-| `⇧↑` / `⇧↓` | Scroll detail pane |
+| `←` / `→` | Move focus between the date list and detail pane (Log, Nutrition) |
+| `↑` / `↓` or `k` / `j` | Navigate dates — or scroll the detail pane once it has focus |
+| `⇧↑` / `⇧↓` | Scroll the detail pane without moving focus off the date list |
 | `/` | Filter dates (Log and Nutrition tabs) |
 | `s` | Cycle sort order (logged → by points → by kcal) |
 | `r` | Change date range |

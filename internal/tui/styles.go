@@ -25,10 +25,19 @@ func newDateList(items []list.Item, width, height int) list.Model {
 	l := list.New(items, del, width, height)
 	l.Title = "Dates"
 	l.Styles.Title = styleMealHeading
+	// Title hidden: the pane is now boxed (see paneBox) and the filter bar
+	// above the list already labels it, so a repeated "Dates" title is
+	// redundant — dropping it also reclaims the 2 rows the box's own top
+	// border costs, keeping the list's visible row count unchanged overall.
+	l.SetShowTitle(false)
 	l.SetShowStatusBar(false)
 	l.SetShowHelp(false)
 	l.SetFilteringEnabled(false)
 	l.KeyMap.Quit = key.NewBinding() // top-level model handles q and ctrl+c
+	// "left"/"right" belong to keys.FocusPrev/FocusNext (pane focus) now,
+	// not list pagination — h/pgup/b/u and l/pgdown/f/d still page.
+	l.KeyMap.PrevPage = key.NewBinding(key.WithKeys("h", "pgup", "b", "u"), key.WithHelp("pgup", "prev page"))
+	l.KeyMap.NextPage = key.NewBinding(key.WithKeys("l", "pgdown", "f", "d"), key.WithHelp("pgdn", "next page"))
 	return l
 }
 
@@ -95,10 +104,6 @@ var (
 	styleStatusKey = lipgloss.NewStyle().
 			Background(colorPanel).
 			Foreground(colorTeal)
-
-	stylePanelBorder = lipgloss.NewStyle().
-				Border(lipgloss.NormalBorder(), false, true, false, false).
-				BorderForeground(colorLine)
 
 	styleMealHeading = lipgloss.NewStyle().
 				Foreground(colorTeal).

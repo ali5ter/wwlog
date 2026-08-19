@@ -40,18 +40,22 @@ func (s sortMode) next() sortMode {
 
 // logModel is the food log tab — a date list on the left, meal detail on the right.
 type logModel struct {
-	list        list.Model
-	filter      textinput.Model
-	filtering   bool
-	detail      viewport.Model
-	allLogs     []*api.DayLog
-	logs        []*api.DayLog // filtered view
-	width       int
-	height      int
-	selected    int
-	sort        sortMode
-	locale      locale
-	initialized bool
+	list      list.Model
+	filter    textinput.Model
+	filtering bool
+	detail    viewport.Model
+	// detailFocused is true when the detail pane, rather than the date
+	// list, has keyboard focus — see keys.FocusPrev/FocusNext. While true,
+	// Up/Down scroll the detail pane instead of navigating dates.
+	detailFocused bool
+	allLogs       []*api.DayLog
+	logs          []*api.DayLog // filtered view
+	width         int
+	height        int
+	selected      int
+	sort          sortMode
+	locale        locale
+	initialized   bool
 }
 
 type dateItem struct {
@@ -64,9 +68,12 @@ func (d dateItem) Description() string { return mealSummary(d.log, d.locale) }
 func (d dateItem) FilterValue() string { return d.log.Date }
 
 func newLogModel(logs []*api.DayLog, width, height int, loc locale) logModel {
-	listWidth := width / 3
-	detailWidth := width - listWidth
-	listHeight := height - 2 // filter bar + separator
+	listOuter := listPaneWidth(width)
+	detailOuter := detailPaneWidth(width)
+	listWidth := paneContentWidth(listOuter)
+	listHeight := paneContentHeight(height) - paneFilterRows
+	detailWidth := paneContentWidth(detailOuter)
+	detailHeight := paneContentHeight(height)
 
 	items := make([]list.Item, len(logs))
 	for i, l := range logs {
@@ -83,7 +90,7 @@ func newLogModel(logs []*api.DayLog, width, height int, loc locale) logModel {
 	fi.SetStyles(fiStyles)
 	fi.Prompt = "> "
 
-	vp := viewport.New(viewport.WithWidth(detailWidth), viewport.WithHeight(height))
+	vp := viewport.New(viewport.WithWidth(detailWidth), viewport.WithHeight(detailHeight))
 	vp.MouseWheelEnabled = true
 
 	m := logModel{
@@ -98,7 +105,7 @@ func newLogModel(logs []*api.DayLog, width, height int, loc locale) logModel {
 		initialized: true,
 	}
 	if len(logs) > 0 {
-		m.detail.SetContent(renderDay(logs[0], detailWidth-2, m.sort, loc))
+		m.detail.SetContent(renderDay(logs[0], m.detail.Width(), m.sort, loc))
 	}
 	return m
 }
@@ -131,17 +138,34 @@ func (m logModel) update(msg tea.Msg) (logModel, tea.Cmd) {
 			case key.Matches(msg, keys.Filter):
 				m.filtering = true
 				m.filter.Focus()
+				// "/" belongs to the list — filtering while the detail pane
+				// is focused would otherwise leave the two states
+				// contradicting each other (see the "up/k/down/j while
+				// filtering" fallthrough above, which assumes list focus).
+				m.detailFocused = false
 				return m, textinput.Blink
+			case key.Matches(msg, keys.FocusPrev):
+				m.detailFocused = false
+				return m, nil
+			case key.Matches(msg, keys.FocusNext):
+				m.detailFocused = true
+				return m, nil
+			case m.detailFocused && key.Matches(msg, keys.Up):
+				m.detail.ScrollUp(detailScrollStep)
+				return m, nil
+			case m.detailFocused && key.Matches(msg, keys.Down):
+				m.detail.ScrollDown(detailScrollStep)
+				return m, nil
 			case key.Matches(msg, keys.ScrollUp):
-				m.detail.ScrollUp(3)
+				m.detail.ScrollUp(detailScrollStep)
 				return m, nil
 			case key.Matches(msg, keys.ScrollDown):
-				m.detail.ScrollDown(3)
+				m.detail.ScrollDown(detailScrollStep)
 				return m, nil
 			case key.Matches(msg, keys.Sort):
 				m.sort = m.sort.next()
 				if m.selected < len(m.logs) {
-					m.detail.SetContent(renderDay(m.logs[m.selected], m.detail.Width()-2, m.sort, m.locale))
+					m.detail.SetContent(renderDay(m.logs[m.selected], m.detail.Width(), m.sort, m.locale))
 					m.detail.GotoTop()
 				}
 				return m, nil
@@ -149,17 +173,24 @@ func (m logModel) update(msg tea.Msg) (logModel, tea.Cmd) {
 		}
 	}
 
-	// Mouse wheel scrolls the detail viewport, not the date list.
+	// Mouse wheel scrolls the detail viewport, not the date list, regardless
+	// of pane focus — positional, like shift+up/down.
 	if _, ok := msg.(tea.MouseWheelMsg); ok {
 		m.detail, cmd = m.detail.Update(msg)
 		return m, cmd
 	}
 
-	// Click on a date row in the list pane selects that row.
-	if click, ok := msg.(tea.MouseClickMsg); ok {
+	// Click on a date row in the list pane selects that row and refocuses
+	// the list; a click landing in the detail pane instead focuses it. The
+	// click.Y >= 2 guard excludes the global header row (tab strip, date
+	// range) so a click there can't be mistaken for a pane click.
+	if click, ok := msg.(tea.MouseClickMsg); ok && click.Y >= 2 {
 		if idx, ok := m.dateRowAtPoint(click.X, click.Y); ok {
+			m.detailFocused = false
 			m.list.Select(idx)
 			// Drive the same selection-change path as keyboard nav below.
+		} else if click.X >= listPaneWidth(m.width) {
+			m.detailFocused = true
 		}
 	}
 
@@ -169,7 +200,7 @@ func (m logModel) update(msg tea.Msg) (logModel, tea.Cmd) {
 	selChanged := false
 	if i := m.list.Index(); i != m.selected && i < len(m.logs) {
 		m.selected = i
-		m.detail.SetContent(renderDay(m.logs[i], m.detail.Width()-2, m.sort, m.locale))
+		m.detail.SetContent(renderDay(m.logs[i], m.detail.Width(), m.sort, m.locale))
 		m.detail.GotoTop()
 		selChanged = true
 	}
@@ -206,7 +237,7 @@ func (m *logModel) applyFilter() {
 	m.list.SetItems(items)
 	m.selected = 0
 	if len(filtered) > 0 {
-		m.detail.SetContent(renderDay(filtered[0], m.detail.Width()-2, m.sort, m.locale))
+		m.detail.SetContent(renderDay(filtered[0], m.detail.Width(), m.sort, m.locale))
 	} else {
 		m.detail.SetContent(styleFoodPortion.Render("No matching dates."))
 	}
@@ -214,8 +245,8 @@ func (m *logModel) applyFilter() {
 }
 
 func (m logModel) view() string {
-	listWidth := m.width / 3
-	detailWidth := m.width - listWidth
+	listOuter := listPaneWidth(m.width)
+	detailOuter := detailPaneWidth(m.width)
 
 	var filterBar string
 	if m.filtering {
@@ -225,47 +256,22 @@ func (m logModel) view() string {
 	} else {
 		filterBar = styleDim.Render("> filter by date…")
 	}
-	filterSep := styleDim.Render(strings.Repeat("─", listWidth-1))
+	filterSep := styleDim.Render(strings.Repeat("─", max(0, paneContentWidth(listOuter))))
 
-	listPane := stylePanelBorder.Width(listWidth).Render(
+	listPane := paneBox(
 		lipgloss.JoinVertical(lipgloss.Left, filterBar, filterSep, m.list.View()),
+		listOuter, m.height, !m.detailFocused,
 	)
-	detailPane := lipgloss.NewStyle().Width(detailWidth).Padding(0, 1).Render(m.detail.View())
+	detailPane := paneBox(m.detail.View(), detailOuter, m.height, m.detailFocused)
 	return lipgloss.JoinHorizontal(lipgloss.Top, listPane, detailPane)
 }
 
 // dateRowAtPoint returns the absolute list index at the given terminal
-// coordinate, or false if the point is not on a list row. Layout assumes
-// the global TUI frame: header (row 0), separator (row 1), then the tab
-// content begins. Inside the Log/Nutrition list pane, a filter bar and a
-// separator occupy the first two rows; date rows follow with the default
-// delegate's item height + 1 row of spacing between items.
+// coordinate, or false if the point is not on a list row. Delegates to the
+// shared implementation in panes.go (identical for Log and Nutrition).
 func (m logModel) dateRowAtPoint(x, y int) (int, bool) {
-	listWidth := m.width / 3
-	if x < 0 || x >= listWidth {
-		return 0, false
-	}
-	const headerRows = 2 // global header + separator
-	const filterRows = 2 // filter bar + separator inside the list pane
-	rowStride := defaultDelegateRowStride()
-	rowsTop := headerRows + filterRows
-	if y < rowsTop {
-		return 0, false
-	}
-	first := m.list.Paginator.Page * m.list.Paginator.PerPage
-	offset := (y - rowsTop) / rowStride
-	idx := first + offset
-	items := m.list.Items()
-	if idx < 0 || idx >= len(items) {
-		return 0, false
-	}
-	return idx, true
+	return dateRowAtPoint(x, y, m.width, m.list.Paginator.Page, m.list.Paginator.PerPage, len(m.list.Items()))
 }
-
-// defaultDelegateRowStride returns the on-screen rows occupied by one item
-// plus the spacing below it under bubbles' default delegate (height 2 +
-// spacing 1 = 3 rows per item slot).
-func defaultDelegateRowStride() int { return 3 }
 
 func (m *logModel) resize(width, height int) {
 	if !m.initialized {
@@ -273,14 +279,17 @@ func (m *logModel) resize(width, height int) {
 	}
 	m.width = width
 	m.height = height
-	listWidth := width / 3
-	listHeight := height - 2
+	listOuter := listPaneWidth(width)
+	detailOuter := detailPaneWidth(width)
+	listWidth := paneContentWidth(listOuter)
+	listHeight := paneContentHeight(height) - paneFilterRows
+	detailWidth := paneContentWidth(detailOuter)
+	detailHeight := paneContentHeight(height)
 	m.list.SetSize(listWidth, listHeight)
-	detailWidth := width - listWidth
 	m.detail.SetWidth(detailWidth)
-	m.detail.SetHeight(height)
+	m.detail.SetHeight(detailHeight)
 	if m.selected < len(m.logs) && len(m.logs) > 0 {
-		m.detail.SetContent(renderDay(m.logs[m.selected], detailWidth-2, m.sort, m.locale))
+		m.detail.SetContent(renderDay(m.logs[m.selected], m.detail.Width(), m.sort, m.locale))
 	}
 }
 
