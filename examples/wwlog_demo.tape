@@ -47,13 +47,11 @@ Sleep 800ms
 # Focus the detail pane (border highlights, footer hint flips to
 # "scroll detail") to read a longer day's meals, then return to the list
 Right
-Sleep 700ms
-Down
-Sleep 350ms
-Down
-Sleep 350ms
-Left
 Sleep 600ms
+Down
+Sleep 400ms
+Left
+Sleep 500ms
 
 # Sort food entries: logged order → by points → by kcal
 Type "s"
@@ -98,21 +96,21 @@ Sleep 800ms
 # Focus the detail pane and scroll past the nutrient bars into the
 # Carbs/Fat trend charts below the fold
 Right
+Sleep 700ms
+Down
+Sleep 300ms
+Down
+Sleep 300ms
+Down
+Sleep 300ms
+Down
+Sleep 300ms
+Down
+Sleep 300ms
+Down
 Sleep 900ms
-Down
-Sleep 350ms
-Down
-Sleep 350ms
-Down
-Sleep 350ms
-Down
-Sleep 350ms
-Down
-Sleep 350ms
-Down
-Sleep 1000ms
 Left
-Sleep 600ms
+Sleep 500ms
 
 # ── Insights tab ─────────────────────────────────────────────
 Tab
