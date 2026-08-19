@@ -40,18 +40,22 @@ func (s sortMode) next() sortMode {
 
 // logModel is the food log tab — a date list on the left, meal detail on the right.
 type logModel struct {
-	list        list.Model
-	filter      textinput.Model
-	filtering   bool
-	detail      viewport.Model
-	allLogs     []*api.DayLog
-	logs        []*api.DayLog // filtered view
-	width       int
-	height      int
-	selected    int
-	sort        sortMode
-	locale      locale
-	initialized bool
+	list      list.Model
+	filter    textinput.Model
+	filtering bool
+	detail    viewport.Model
+	// detailFocused is true when the detail pane, rather than the date
+	// list, has keyboard focus — see keys.FocusPrev/FocusNext. While true,
+	// Up/Down scroll the detail pane instead of navigating dates.
+	detailFocused bool
+	allLogs       []*api.DayLog
+	logs          []*api.DayLog // filtered view
+	width         int
+	height        int
+	selected      int
+	sort          sortMode
+	locale        locale
+	initialized   bool
 }
 
 type dateItem struct {
@@ -134,12 +138,29 @@ func (m logModel) update(msg tea.Msg) (logModel, tea.Cmd) {
 			case key.Matches(msg, keys.Filter):
 				m.filtering = true
 				m.filter.Focus()
+				// "/" belongs to the list — filtering while the detail pane
+				// is focused would otherwise leave the two states
+				// contradicting each other (see the "up/k/down/j while
+				// filtering" fallthrough above, which assumes list focus).
+				m.detailFocused = false
 				return m, textinput.Blink
+			case key.Matches(msg, keys.FocusPrev):
+				m.detailFocused = false
+				return m, nil
+			case key.Matches(msg, keys.FocusNext):
+				m.detailFocused = true
+				return m, nil
+			case m.detailFocused && key.Matches(msg, keys.Up):
+				m.detail.ScrollUp(detailScrollStep)
+				return m, nil
+			case m.detailFocused && key.Matches(msg, keys.Down):
+				m.detail.ScrollDown(detailScrollStep)
+				return m, nil
 			case key.Matches(msg, keys.ScrollUp):
-				m.detail.ScrollUp(3)
+				m.detail.ScrollUp(detailScrollStep)
 				return m, nil
 			case key.Matches(msg, keys.ScrollDown):
-				m.detail.ScrollDown(3)
+				m.detail.ScrollDown(detailScrollStep)
 				return m, nil
 			case key.Matches(msg, keys.Sort):
 				m.sort = m.sort.next()
@@ -152,17 +173,24 @@ func (m logModel) update(msg tea.Msg) (logModel, tea.Cmd) {
 		}
 	}
 
-	// Mouse wheel scrolls the detail viewport, not the date list.
+	// Mouse wheel scrolls the detail viewport, not the date list, regardless
+	// of pane focus — positional, like shift+up/down.
 	if _, ok := msg.(tea.MouseWheelMsg); ok {
 		m.detail, cmd = m.detail.Update(msg)
 		return m, cmd
 	}
 
-	// Click on a date row in the list pane selects that row.
-	if click, ok := msg.(tea.MouseClickMsg); ok {
+	// Click on a date row in the list pane selects that row and refocuses
+	// the list; a click landing in the detail pane instead focuses it. The
+	// click.Y >= 2 guard excludes the global header row (tab strip, date
+	// range) so a click there can't be mistaken for a pane click.
+	if click, ok := msg.(tea.MouseClickMsg); ok && click.Y >= 2 {
 		if idx, ok := m.dateRowAtPoint(click.X, click.Y); ok {
+			m.detailFocused = false
 			m.list.Select(idx)
 			// Drive the same selection-change path as keyboard nav below.
+		} else if click.X >= listPaneWidth(m.width) {
+			m.detailFocused = true
 		}
 	}
 
@@ -232,9 +260,9 @@ func (m logModel) view() string {
 
 	listPane := paneBox(
 		lipgloss.JoinVertical(lipgloss.Left, filterBar, filterSep, m.list.View()),
-		listOuter, m.height, false,
+		listOuter, m.height, !m.detailFocused,
 	)
-	detailPane := paneBox(m.detail.View(), detailOuter, m.height, false)
+	detailPane := paneBox(m.detail.View(), detailOuter, m.height, m.detailFocused)
 	return lipgloss.JoinHorizontal(lipgloss.Top, listPane, detailPane)
 }
 

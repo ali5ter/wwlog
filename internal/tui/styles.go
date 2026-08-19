@@ -34,6 +34,10 @@ func newDateList(items []list.Item, width, height int) list.Model {
 	l.SetShowHelp(false)
 	l.SetFilteringEnabled(false)
 	l.KeyMap.Quit = key.NewBinding() // top-level model handles q and ctrl+c
+	// "left"/"right" belong to keys.FocusPrev/FocusNext (pane focus) now,
+	// not list pagination — h/pgup/b/u and l/pgdown/f/d still page.
+	l.KeyMap.PrevPage = key.NewBinding(key.WithKeys("h", "pgup", "b", "u"), key.WithHelp("pgup", "prev page"))
+	l.KeyMap.NextPage = key.NewBinding(key.WithKeys("l", "pgdown", "f", "d"), key.WithHelp("pgdn", "next page"))
 	return l
 }
 

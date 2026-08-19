@@ -101,21 +101,25 @@ func resolveRef(targets *config.Targets, metric string) nutriRef {
 }
 
 type nutriModel struct {
-	list        list.Model
-	filter      textinput.Model
-	filtering   bool
-	detail      viewport.Model
-	allLogs     []*api.DayLog
-	logs        []*api.DayLog // filtered view
-	allData     map[string]*api.DayNutrition
-	data        map[string]*api.DayNutrition // filtered view
-	avgs        *api.DayNutrition
-	width       int
-	height      int
-	selected    int
-	locale      locale
-	targets     *config.Targets
-	initialized bool
+	list      list.Model
+	filter    textinput.Model
+	filtering bool
+	detail    viewport.Model
+	// detailFocused is true when the detail pane, rather than the date
+	// list, has keyboard focus — see keys.FocusPrev/FocusNext. While true,
+	// Up/Down scroll the detail pane instead of navigating dates.
+	detailFocused bool
+	allLogs       []*api.DayLog
+	logs          []*api.DayLog // filtered view
+	allData       map[string]*api.DayNutrition
+	data          map[string]*api.DayNutrition // filtered view
+	avgs          *api.DayNutrition
+	width         int
+	height        int
+	selected      int
+	locale        locale
+	targets       *config.Targets
+	initialized   bool
 }
 
 func newNutriModel(logs []*api.DayLog, data map[string]*api.DayNutrition, width, height int, loc locale, targets *config.Targets) nutriModel {
@@ -191,27 +195,47 @@ func (m nutriModel) update(msg tea.Msg) (nutriModel, tea.Cmd) {
 			case key.Matches(msg, keys.Filter):
 				m.filtering = true
 				m.filter.Focus()
+				// "/" belongs to the list — see logModel's identical guard.
+				m.detailFocused = false
 				return m, textinput.Blink
+			case key.Matches(msg, keys.FocusPrev):
+				m.detailFocused = false
+				return m, nil
+			case key.Matches(msg, keys.FocusNext):
+				m.detailFocused = true
+				return m, nil
+			case m.detailFocused && key.Matches(msg, keys.Up):
+				m.detail.ScrollUp(detailScrollStep)
+				return m, nil
+			case m.detailFocused && key.Matches(msg, keys.Down):
+				m.detail.ScrollDown(detailScrollStep)
+				return m, nil
 			case key.Matches(msg, keys.ScrollUp):
-				m.detail.ScrollUp(3)
+				m.detail.ScrollUp(detailScrollStep)
 				return m, nil
 			case key.Matches(msg, keys.ScrollDown):
-				m.detail.ScrollDown(3)
+				m.detail.ScrollDown(detailScrollStep)
 				return m, nil
 			}
 		}
 	}
 
-	// Mouse wheel scrolls the detail viewport, not the date list.
+	// Mouse wheel scrolls the detail viewport, not the date list, regardless
+	// of pane focus — positional, like shift+up/down.
 	if _, ok := msg.(tea.MouseWheelMsg); ok {
 		m.detail, cmd = m.detail.Update(msg)
 		return m, cmd
 	}
 
-	// Click on a date row in the list pane selects that row.
-	if click, ok := msg.(tea.MouseClickMsg); ok {
+	// Click on a date row in the list pane selects that row and refocuses
+	// the list; a click landing in the detail pane instead focuses it. See
+	// logModel's identical handling for the click.Y >= 2 rationale.
+	if click, ok := msg.(tea.MouseClickMsg); ok && click.Y >= 2 {
 		if idx, ok := m.dateRowAtPoint(click.X, click.Y); ok {
+			m.detailFocused = false
 			m.list.Select(idx)
+		} else if click.X >= listPaneWidth(m.width) {
+			m.detailFocused = true
 		}
 	}
 
@@ -252,9 +276,9 @@ func (m nutriModel) view() string {
 
 	listPane := paneBox(
 		lipgloss.JoinVertical(lipgloss.Left, filterBar, filterSep, m.list.View()),
-		listOuter, m.height, false,
+		listOuter, m.height, !m.detailFocused,
 	)
-	detailPane := paneBox(m.detail.View(), detailOuter, m.height, false)
+	detailPane := paneBox(m.detail.View(), detailOuter, m.height, m.detailFocused)
 	return lipgloss.JoinHorizontal(lipgloss.Top, listPane, detailPane)
 }
 

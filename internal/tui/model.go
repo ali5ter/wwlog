@@ -2,16 +2,16 @@
 package tui
 
 import (
-	"fmt"
-	"strings"
 	"charm.land/bubbles/v2/key"
 	"charm.land/bubbles/v2/spinner"
 	tea "charm.land/bubbletea/v2"
 	"charm.land/huh/v2"
 	"charm.land/lipgloss/v2"
+	"fmt"
 	"github.com/ali5ter/wwlog/config"
 	"github.com/ali5ter/wwlog/internal/api"
 	"github.com/ali5ter/wwlog/internal/auth"
+	"strings"
 )
 
 type appScreen int
@@ -50,7 +50,6 @@ type dataMsg struct {
 
 type versionMsg struct{ latest string }
 
-
 // Model is the top-level Bubble Tea model.
 type Model struct {
 	width  int
@@ -58,8 +57,8 @@ type Model struct {
 	screen appScreen
 	dialog dialogKind
 
-	spinner spinner.Model
-	loading bool
+	spinner       spinner.Model
+	loading       bool
 	err           error
 	activeTab     tab
 	logs          []*api.DayLog
@@ -90,15 +89,15 @@ func Run(authObj *auth.Auth, tld, weightUnit string, ds api.DayStore, targets *c
 	s.Style = lipgloss.NewStyle().Foreground(colorTeal)
 
 	m := Model{
-		spinner: s,
-		screen:  screenSplash,
-		splashModel:   newSplashModel(authObj, version, preStart, preEnd),
-		authObj:       authObj,
-		tld:           tld,
-		weightUnit:    weightUnit,
-		ds:            ds,
-		version:       version,
-		targets:       targets,
+		spinner:     s,
+		screen:      screenSplash,
+		splashModel: newSplashModel(authObj, version, preStart, preEnd),
+		authObj:     authObj,
+		tld:         tld,
+		weightUnit:  weightUnit,
+		ds:          ds,
+		version:     version,
+		targets:     targets,
 	}
 
 	p := tea.NewProgram(m)
@@ -493,20 +492,47 @@ func (m Model) tabAtPoint(x, y int) (int, bool) {
 	return 0, false
 }
 
+// detailFocused reports whether the active tab's detail pane currently has
+// keyboard focus (see keys.FocusPrev/FocusNext). Insights has no list pane
+// — its viewport always takes Up/Down directly — so it is never "focused"
+// in this sense.
+func (m Model) detailFocused() bool {
+	switch m.activeTab {
+	case tabLog:
+		return m.logModel.detailFocused
+	case tabNutrition:
+		return m.nutriModel.detailFocused
+	}
+	return false
+}
+
 func (m Model) statusView() string {
 	if m.statusMsg != "" {
 		return styleStatusBar.Width(m.width).Render(m.statusMsg)
 	}
-	hints := []string{
-		styleStatusKey.Render("↑/↓") + " navigate",
-		styleStatusKey.Render("⇧↑/↓") + " scroll",
-	}
-	if m.activeTab == tabLog || m.activeTab == tabNutrition {
-		hints = append(hints, styleStatusKey.Render("/")+" filter")
+	var hints []string
+	switch m.activeTab {
+	case tabLog, tabNutrition:
+		if m.detailFocused() {
+			hints = append(hints, styleStatusKey.Render("↑/↓")+" scroll detail")
+		} else {
+			hints = append(hints, styleStatusKey.Render("↑/↓")+" navigate")
+		}
+		hints = append(hints,
+			styleStatusKey.Render("←/→")+" focus pane",
+			styleStatusKey.Render("/")+" filter",
+		)
+		if m.activeTab == tabLog {
+			hints = append(hints, styleStatusKey.Render("s")+" sort")
+		}
+	case tabInsights:
+		hints = append(hints,
+			styleStatusKey.Render("↑/↓")+" scroll",
+			styleStatusKey.Render("pgup/pgdn")+" page",
+		)
 	}
 	hints = append(hints,
 		styleStatusKey.Render("r")+" range",
-		styleStatusKey.Render("s")+" sort",
 		styleStatusKey.Render("e")+" export",
 		styleStatusKey.Render("tab")+" switch",
 		styleStatusKey.Render("q")+" quit",
