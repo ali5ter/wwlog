@@ -25,6 +25,11 @@ func newDateList(items []list.Item, width, height int) list.Model {
 	l := list.New(items, del, width, height)
 	l.Title = "Dates"
 	l.Styles.Title = styleMealHeading
+	// Title hidden: the pane is now boxed (see paneBox) and the filter bar
+	// above the list already labels it, so a repeated "Dates" title is
+	// redundant — dropping it also reclaims the 2 rows the box's own top
+	// border costs, keeping the list's visible row count unchanged overall.
+	l.SetShowTitle(false)
 	l.SetShowStatusBar(false)
 	l.SetShowHelp(false)
 	l.SetFilteringEnabled(false)
@@ -95,10 +100,6 @@ var (
 	styleStatusKey = lipgloss.NewStyle().
 			Background(colorPanel).
 			Foreground(colorTeal)
-
-	stylePanelBorder = lipgloss.NewStyle().
-				Border(lipgloss.NormalBorder(), false, true, false, false).
-				BorderForeground(colorLine)
 
 	styleMealHeading = lipgloss.NewStyle().
 				Foreground(colorTeal).

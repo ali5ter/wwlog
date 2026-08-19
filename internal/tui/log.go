@@ -64,9 +64,12 @@ func (d dateItem) Description() string { return mealSummary(d.log, d.locale) }
 func (d dateItem) FilterValue() string { return d.log.Date }
 
 func newLogModel(logs []*api.DayLog, width, height int, loc locale) logModel {
-	listWidth := width / 3
-	detailWidth := width - listWidth
-	listHeight := height - 2 // filter bar + separator
+	listOuter := listPaneWidth(width)
+	detailOuter := detailPaneWidth(width)
+	listWidth := paneContentWidth(listOuter)
+	listHeight := paneContentHeight(height) - paneFilterRows
+	detailWidth := paneContentWidth(detailOuter)
+	detailHeight := paneContentHeight(height)
 
 	items := make([]list.Item, len(logs))
 	for i, l := range logs {
@@ -83,7 +86,7 @@ func newLogModel(logs []*api.DayLog, width, height int, loc locale) logModel {
 	fi.SetStyles(fiStyles)
 	fi.Prompt = "> "
 
-	vp := viewport.New(viewport.WithWidth(detailWidth), viewport.WithHeight(height))
+	vp := viewport.New(viewport.WithWidth(detailWidth), viewport.WithHeight(detailHeight))
 	vp.MouseWheelEnabled = true
 
 	m := logModel{
@@ -98,7 +101,7 @@ func newLogModel(logs []*api.DayLog, width, height int, loc locale) logModel {
 		initialized: true,
 	}
 	if len(logs) > 0 {
-		m.detail.SetContent(renderDay(logs[0], detailWidth-2, m.sort, loc))
+		m.detail.SetContent(renderDay(logs[0], m.detail.Width(), m.sort, loc))
 	}
 	return m
 }
@@ -141,7 +144,7 @@ func (m logModel) update(msg tea.Msg) (logModel, tea.Cmd) {
 			case key.Matches(msg, keys.Sort):
 				m.sort = m.sort.next()
 				if m.selected < len(m.logs) {
-					m.detail.SetContent(renderDay(m.logs[m.selected], m.detail.Width()-2, m.sort, m.locale))
+					m.detail.SetContent(renderDay(m.logs[m.selected], m.detail.Width(), m.sort, m.locale))
 					m.detail.GotoTop()
 				}
 				return m, nil
@@ -169,7 +172,7 @@ func (m logModel) update(msg tea.Msg) (logModel, tea.Cmd) {
 	selChanged := false
 	if i := m.list.Index(); i != m.selected && i < len(m.logs) {
 		m.selected = i
-		m.detail.SetContent(renderDay(m.logs[i], m.detail.Width()-2, m.sort, m.locale))
+		m.detail.SetContent(renderDay(m.logs[i], m.detail.Width(), m.sort, m.locale))
 		m.detail.GotoTop()
 		selChanged = true
 	}
@@ -206,7 +209,7 @@ func (m *logModel) applyFilter() {
 	m.list.SetItems(items)
 	m.selected = 0
 	if len(filtered) > 0 {
-		m.detail.SetContent(renderDay(filtered[0], m.detail.Width()-2, m.sort, m.locale))
+		m.detail.SetContent(renderDay(filtered[0], m.detail.Width(), m.sort, m.locale))
 	} else {
 		m.detail.SetContent(styleFoodPortion.Render("No matching dates."))
 	}
@@ -214,8 +217,8 @@ func (m *logModel) applyFilter() {
 }
 
 func (m logModel) view() string {
-	listWidth := m.width / 3
-	detailWidth := m.width - listWidth
+	listOuter := listPaneWidth(m.width)
+	detailOuter := detailPaneWidth(m.width)
 
 	var filterBar string
 	if m.filtering {
@@ -225,47 +228,22 @@ func (m logModel) view() string {
 	} else {
 		filterBar = styleDim.Render("> filter by date…")
 	}
-	filterSep := styleDim.Render(strings.Repeat("─", listWidth-1))
+	filterSep := styleDim.Render(strings.Repeat("─", max(0, paneContentWidth(listOuter))))
 
-	listPane := stylePanelBorder.Width(listWidth).Render(
+	listPane := paneBox(
 		lipgloss.JoinVertical(lipgloss.Left, filterBar, filterSep, m.list.View()),
+		listOuter, m.height, false,
 	)
-	detailPane := lipgloss.NewStyle().Width(detailWidth).Padding(0, 1).Render(m.detail.View())
+	detailPane := paneBox(m.detail.View(), detailOuter, m.height, false)
 	return lipgloss.JoinHorizontal(lipgloss.Top, listPane, detailPane)
 }
 
 // dateRowAtPoint returns the absolute list index at the given terminal
-// coordinate, or false if the point is not on a list row. Layout assumes
-// the global TUI frame: header (row 0), separator (row 1), then the tab
-// content begins. Inside the Log/Nutrition list pane, a filter bar and a
-// separator occupy the first two rows; date rows follow with the default
-// delegate's item height + 1 row of spacing between items.
+// coordinate, or false if the point is not on a list row. Delegates to the
+// shared implementation in panes.go (identical for Log and Nutrition).
 func (m logModel) dateRowAtPoint(x, y int) (int, bool) {
-	listWidth := m.width / 3
-	if x < 0 || x >= listWidth {
-		return 0, false
-	}
-	const headerRows = 2 // global header + separator
-	const filterRows = 2 // filter bar + separator inside the list pane
-	rowStride := defaultDelegateRowStride()
-	rowsTop := headerRows + filterRows
-	if y < rowsTop {
-		return 0, false
-	}
-	first := m.list.Paginator.Page * m.list.Paginator.PerPage
-	offset := (y - rowsTop) / rowStride
-	idx := first + offset
-	items := m.list.Items()
-	if idx < 0 || idx >= len(items) {
-		return 0, false
-	}
-	return idx, true
+	return dateRowAtPoint(x, y, m.width, m.list.Paginator.Page, m.list.Paginator.PerPage, len(m.list.Items()))
 }
-
-// defaultDelegateRowStride returns the on-screen rows occupied by one item
-// plus the spacing below it under bubbles' default delegate (height 2 +
-// spacing 1 = 3 rows per item slot).
-func defaultDelegateRowStride() int { return 3 }
 
 func (m *logModel) resize(width, height int) {
 	if !m.initialized {
@@ -273,14 +251,17 @@ func (m *logModel) resize(width, height int) {
 	}
 	m.width = width
 	m.height = height
-	listWidth := width / 3
-	listHeight := height - 2
+	listOuter := listPaneWidth(width)
+	detailOuter := detailPaneWidth(width)
+	listWidth := paneContentWidth(listOuter)
+	listHeight := paneContentHeight(height) - paneFilterRows
+	detailWidth := paneContentWidth(detailOuter)
+	detailHeight := paneContentHeight(height)
 	m.list.SetSize(listWidth, listHeight)
-	detailWidth := width - listWidth
 	m.detail.SetWidth(detailWidth)
-	m.detail.SetHeight(height)
+	m.detail.SetHeight(detailHeight)
 	if m.selected < len(m.logs) && len(m.logs) > 0 {
-		m.detail.SetContent(renderDay(m.logs[m.selected], detailWidth-2, m.sort, m.locale))
+		m.detail.SetContent(renderDay(m.logs[m.selected], m.detail.Width(), m.sort, m.locale))
 	}
 }
 

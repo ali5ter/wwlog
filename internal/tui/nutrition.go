@@ -76,16 +76,26 @@ func resolveRef(targets *config.Targets, metric string) nutriRef {
 		}
 	}
 	switch metric {
-	case "calories":    return nutriRef{rdv.Calories, false}
-	case "protein":     return nutriRef{rdv.Protein, false}
-	case "carbs":       return nutriRef{rdv.Carbs, false}
-	case "fat":         return nutriRef{rdv.Fat, false}
-	case "sat_fat":     return nutriRef{rdv.SaturatedFat, false}
-	case "fiber":       return nutriRef{rdv.Fiber, false}
-	case "sodium":      return nutriRef{rdv.Sodium, false}
-	case "sugar":       return nutriRef{rdv.Sugar, false}
-	case "added_sugar": return nutriRef{rdv.AddedSugar, false}
-	case "alcohol":     return nutriRef{rdv.Alcohol, false}
+	case "calories":
+		return nutriRef{rdv.Calories, false}
+	case "protein":
+		return nutriRef{rdv.Protein, false}
+	case "carbs":
+		return nutriRef{rdv.Carbs, false}
+	case "fat":
+		return nutriRef{rdv.Fat, false}
+	case "sat_fat":
+		return nutriRef{rdv.SaturatedFat, false}
+	case "fiber":
+		return nutriRef{rdv.Fiber, false}
+	case "sodium":
+		return nutriRef{rdv.Sodium, false}
+	case "sugar":
+		return nutriRef{rdv.Sugar, false}
+	case "added_sugar":
+		return nutriRef{rdv.AddedSugar, false}
+	case "alcohol":
+		return nutriRef{rdv.Alcohol, false}
 	}
 	return nutriRef{1, false}
 }
@@ -109,8 +119,12 @@ type nutriModel struct {
 }
 
 func newNutriModel(logs []*api.DayLog, data map[string]*api.DayNutrition, width, height int, loc locale, targets *config.Targets) nutriModel {
-	listWidth := width / 3
-	listHeight := height - 2
+	listOuter := listPaneWidth(width)
+	detailOuter := detailPaneWidth(width)
+	listWidth := paneContentWidth(listOuter)
+	listHeight := paneContentHeight(height) - paneFilterRows
+	detailWidth := paneContentWidth(detailOuter)
+	detailHeight := paneContentHeight(height)
 
 	items := make([]list.Item, len(logs))
 	for i, l := range logs {
@@ -127,7 +141,7 @@ func newNutriModel(logs []*api.DayLog, data map[string]*api.DayNutrition, width,
 	fi.SetStyles(fiStyles)
 	fi.Prompt = "> "
 
-	vp := viewport.New(viewport.WithWidth(width-listWidth), viewport.WithHeight(height))
+	vp := viewport.New(viewport.WithWidth(detailWidth), viewport.WithHeight(detailHeight))
 	vp.MouseWheelEnabled = true
 
 	m := nutriModel{
@@ -223,8 +237,8 @@ func (m nutriModel) update(msg tea.Msg) (nutriModel, tea.Cmd) {
 }
 
 func (m nutriModel) view() string {
-	listWidth := m.width / 3
-	detailWidth := m.width - listWidth
+	listOuter := listPaneWidth(m.width)
+	detailOuter := detailPaneWidth(m.width)
 
 	var filterBar string
 	if m.filtering {
@@ -234,12 +248,13 @@ func (m nutriModel) view() string {
 	} else {
 		filterBar = styleDim.Render("> filter by date…")
 	}
-	filterSep := styleDim.Render(strings.Repeat("─", listWidth-1))
+	filterSep := styleDim.Render(strings.Repeat("─", max(0, paneContentWidth(listOuter))))
 
-	listPane := stylePanelBorder.Width(listWidth).Render(
+	listPane := paneBox(
 		lipgloss.JoinVertical(lipgloss.Left, filterBar, filterSep, m.list.View()),
+		listOuter, m.height, false,
 	)
-	detailPane := lipgloss.NewStyle().Width(detailWidth).Padding(0, 1).Render(m.detail.View())
+	detailPane := paneBox(m.detail.View(), detailOuter, m.height, false)
 	return lipgloss.JoinHorizontal(lipgloss.Top, listPane, detailPane)
 }
 
@@ -276,29 +291,10 @@ func (m *nutriModel) applyFilter() {
 	m.detail.GotoTop()
 }
 
-// dateRowAtPoint mirrors logModel.dateRowAtPoint — returns the absolute
-// list index at the given terminal coordinate, or false if the point is
-// not on a list row.
+// dateRowAtPoint mirrors logModel.dateRowAtPoint — delegates to the shared
+// implementation in panes.go.
 func (m nutriModel) dateRowAtPoint(x, y int) (int, bool) {
-	listWidth := m.width / 3
-	if x < 0 || x >= listWidth {
-		return 0, false
-	}
-	const headerRows = 2
-	const filterRows = 2
-	rowStride := defaultDelegateRowStride()
-	rowsTop := headerRows + filterRows
-	if y < rowsTop {
-		return 0, false
-	}
-	first := m.list.Paginator.Page * m.list.Paginator.PerPage
-	offset := (y - rowsTop) / rowStride
-	idx := first + offset
-	items := m.list.Items()
-	if idx < 0 || idx >= len(items) {
-		return 0, false
-	}
-	return idx, true
+	return dateRowAtPoint(x, y, m.width, m.list.Paginator.Page, m.list.Paginator.PerPage, len(m.list.Items()))
 }
 
 func (m *nutriModel) resize(width, height int) {
@@ -307,11 +303,11 @@ func (m *nutriModel) resize(width, height int) {
 	}
 	m.width = width
 	m.height = height
-	listWidth := width / 3
-	m.list.SetSize(listWidth, height-2) // -2 for filter bar + separator
-	detailWidth := width - listWidth
-	m.detail.SetWidth(detailWidth)
-	m.detail.SetHeight(height)
+	listOuter := listPaneWidth(width)
+	detailOuter := detailPaneWidth(width)
+	m.list.SetSize(paneContentWidth(listOuter), paneContentHeight(height)-paneFilterRows)
+	m.detail.SetWidth(paneContentWidth(detailOuter))
+	m.detail.SetHeight(paneContentHeight(height))
 	m.detail.SetContent(m.renderDetail())
 }
 
@@ -329,7 +325,7 @@ func (m *nutriModel) renderDetail() string {
 		return styleFoodPortion.Render("No data for this date.")
 	}
 
-	vw := m.detail.Width() - 2
+	vw := m.detail.Width()
 	if vw < 40 {
 		vw = 40
 	}
