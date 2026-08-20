@@ -44,6 +44,12 @@ func (m insightsModel) update(msg tea.Msg) (insightsModel, tea.Cmd) {
 		case key.Matches(msg, keys.ScrollDown):
 			m.viewport.ScrollDown(3)
 			return m, nil
+		case key.Matches(msg, keys.GotoTop):
+			m.viewport.GotoTop()
+			return m, nil
+		case key.Matches(msg, keys.GotoBottom):
+			m.viewport.GotoBottom()
+			return m, nil
 		}
 	}
 	var cmd tea.Cmd

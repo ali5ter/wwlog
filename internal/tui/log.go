@@ -162,6 +162,28 @@ func (m logModel) update(msg tea.Msg) (logModel, tea.Cmd) {
 			case key.Matches(msg, keys.ScrollDown):
 				m.detail.ScrollDown(detailScrollStep)
 				return m, nil
+			// Page/half-page/top/bottom only take over the detail pane
+			// while it has focus — otherwise they're the date list's own
+			// paging keys (see newDateList) and must fall through to
+			// m.list.Update below rather than being consumed here.
+			case m.detailFocused && key.Matches(msg, keys.GotoTop):
+				m.detail.GotoTop()
+				return m, nil
+			case m.detailFocused && key.Matches(msg, keys.GotoBottom):
+				m.detail.GotoBottom()
+				return m, nil
+			case m.detailFocused && key.Matches(msg, keys.PageUp):
+				m.detail.PageUp()
+				return m, nil
+			case m.detailFocused && key.Matches(msg, keys.PageDown):
+				m.detail.PageDown()
+				return m, nil
+			case m.detailFocused && key.Matches(msg, keys.HalfPageUp):
+				m.detail.HalfPageUp()
+				return m, nil
+			case m.detailFocused && key.Matches(msg, keys.HalfPageDown):
+				m.detail.HalfPageDown()
+				return m, nil
 			case key.Matches(msg, keys.Sort):
 				m.sort = m.sort.next()
 				if m.selected < len(m.logs) {

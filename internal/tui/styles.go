@@ -83,6 +83,14 @@ var (
 				Foreground(colorTeal).
 				Bold(true)
 
+	// styleHeaderBadge renders the app name as a solid pill rather than
+	// plain accent text — glow's "Glow" badge is the reference.
+	styleHeaderBadge = lipgloss.NewStyle().
+				Background(colorTeal).
+				Foreground(colorPanel).
+				Bold(true).
+				Padding(0, 1)
+
 	styleTabActive = lipgloss.NewStyle().
 			Background(colorLine).
 			Foreground(colorTeal).
@@ -104,6 +112,28 @@ var (
 	styleStatusKey = lipgloss.NewStyle().
 			Background(colorPanel).
 			Foreground(colorTeal)
+
+	// Notification bars — full-width, solid background so a status message
+	// (export result, filter/load notice) reads unambiguously at a glance,
+	// the same way glow's "Copied contents" bar does. Rendering (which kind,
+	// which text) lives in statusView (model.go); these are just the three
+	// available treatments.
+	styleNotifySuccess = lipgloss.NewStyle().
+				Background(colorTeal).
+				Foreground(colorPanel).
+				Bold(true).
+				Padding(0, 1)
+
+	styleNotifyError = lipgloss.NewStyle().
+				Background(colorPurple).
+				Foreground(colorText).
+				Bold(true).
+				Padding(0, 1)
+
+	styleNotifyInfo = lipgloss.NewStyle().
+			Background(colorLine).
+			Foreground(colorText).
+			Padding(0, 1)
 
 	styleMealHeading = lipgloss.NewStyle().
 				Foreground(colorTeal).

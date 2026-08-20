@@ -261,12 +261,16 @@ wwlog --offline --start 2026-04-20 --end 2026-04-26 --json | jq '...'
 |-----|--------|
 | `←` / `→` | Move focus between the date list and detail pane (Log, Nutrition) |
 | `↑` / `↓` or `k` / `j` | Navigate dates — or scroll the detail pane once it has focus |
+| `g` / `home`, `G` / `end` | Jump to the top/bottom of the focused date list or detail pane |
+| `b` / `pgup`, `f` / `pgdn` | Page up/down in the focused date list or detail pane |
+| `u`, `d` | Half-page up/down in the focused date list or detail pane |
 | `⇧↑` / `⇧↓` | Scroll the detail pane without moving focus off the date list |
 | `/` | Filter dates (Log and Nutrition tabs) |
 | `s` | Cycle sort order (logged → by points → by kcal) |
 | `r` | Change date range |
 | `e` | Export (opens format picker) |
 | `tab` / `⇧tab` | Switch tabs |
+| `?` | Toggle the keyboard-shortcut panel |
 | `q` or `ctrl+c` | Quit |
 
 ## Options

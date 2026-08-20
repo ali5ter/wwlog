@@ -79,8 +79,21 @@ type Model struct {
 	latestVersion  string
 	client         *api.Client
 	statusMsg      string
+	statusKind     statusKind
+	helpOpen       bool
 	targets        *config.Targets
 }
+
+// statusKind selects how statusView renders m.statusMsg — a plain hint line
+// when statusNone, otherwise a solid-colour notification bar (styles.go).
+type statusKind int
+
+const (
+	statusNone statusKind = iota
+	statusInfo
+	statusSuccess
+	statusError
+)
 
 // Run initialises and starts the TUI, blocking until the user quits.
 func Run(authObj *auth.Auth, tld, weightUnit string, ds api.DayStore, targets *config.Targets, preStart, preEnd string, version string) error {
@@ -160,7 +173,8 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			m.client = msg.client
 		}
 		if len(msg.notices) > 0 {
-			m.statusMsg = styleFoodPortion.Render("  " + strings.Join(msg.notices, " · "))
+			m.statusMsg = strings.Join(msg.notices, " · ")
+			m.statusKind = statusInfo
 		}
 		// Nutrition is embedded in each food entry — compute synchronously, no extra API calls.
 		nutrition := api.ComputeAllNutrition(m.logs)
@@ -177,9 +191,11 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	case exportDoneMsg:
 		m.screen = screenLog
 		if msg.err != nil {
-			m.statusMsg = styleError.Render("  Export failed: " + msg.err.Error())
+			m.statusMsg = "Export failed: " + msg.err.Error()
+			m.statusKind = statusError
 		} else {
-			m.statusMsg = styleMealHeading.Render("  ✓ Exported → " + msg.filename)
+			m.statusMsg = "✓ Exported → " + msg.filename
+			m.statusKind = statusSuccess
 		}
 		return m, nil
 
@@ -197,6 +213,7 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			if i, ok := m.tabAtPoint(msg.X, msg.Y); ok {
 				m.activeTab = tab(i)
 				m.statusMsg = ""
+				m.statusKind = statusNone
 				return m, nil
 			}
 		}
@@ -226,7 +243,8 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 				format := m.exportModel.form.GetString("format")
 				dir := m.exportModel.form.GetString("dir")
 				m.dialog = dialogNone
-				m.statusMsg = styleFoodPortion.Render("  Saving…")
+				m.statusMsg = "Saving…"
+				m.statusKind = statusInfo
 				return m, runExport(format, dir, m.start, m.end, m.logs, m.targets)
 			}
 			if m.exportModel.form.State == huh.StateAborted {
@@ -279,11 +297,27 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		if key.Matches(msg, keys.Quit) {
 			return m, tea.Quit
 		}
+		// While the help panel is open, swallow every key except the ones
+		// that close it (?/esc) — q/ctrl+c already returned above. This
+		// keeps the panel from being left open over stale content and
+		// avoids double-handling a key as both "close help" and "also do
+		// the thing that key normally does" (e.g. "r" opening the range
+		// dialog underneath).
+		if m.helpOpen {
+			if key.Matches(msg, keys.Help) || msg.String() == "esc" {
+				m.helpOpen = false
+			}
+			return m, nil
+		}
 		m.statusMsg = "" // any keypress clears the status message
+		m.statusKind = statusNone
 		tabFiltering := (m.activeTab == tabLog && m.logModel.filtering) ||
 			(m.activeTab == tabNutrition && m.nutriModel.filtering)
 		if !m.loading && m.err == nil && !tabFiltering {
 			switch {
+			case key.Matches(msg, keys.Help):
+				m.helpOpen = true
+				return m, nil
 			case key.Matches(msg, keys.Export):
 				m.exportModel = newExportModel(m.width, m.height)
 				m.dialog = dialogExport
@@ -318,7 +352,8 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			format := m.exportModel.form.GetString("format")
 			dir := m.exportModel.form.GetString("dir")
 			m.dialog = dialogNone
-			m.statusMsg = styleFoodPortion.Render("  Saving…")
+			m.statusMsg = "Saving…"
+			m.statusKind = statusInfo
 			return m, runExport(format, dir, m.start, m.end, m.logs, m.targets)
 		}
 		return m, cmd
@@ -417,6 +452,14 @@ func (m Model) viewContent() string {
 		return overlayDialog(main, loadingDialog, m.width, m.height)
 	}
 
+	// The help panel and the export/date-range dialogs are mutually
+	// exclusive — helpOpen is only ever set while m.dialog is dialogNone
+	// (see the key handler in Update) — so checking it first is safe.
+	if m.helpOpen {
+		hkm := helpKeyMap{activeTab: m.activeTab}
+		return overlayDialog(main, helpPanel(hkm, m.width), m.width, m.height)
+	}
+
 	// If a dialog is active, composite it on top of the main TUI. The Lipgloss
 	// v2 compositor draws layers in z-order at cell coordinates, so the main
 	// content stays visible behind/around the dialog box.
@@ -448,7 +491,8 @@ func overlayDialog(bg, dialog string, width, height int) string {
 }
 
 func (m Model) headerView() string {
-	title := styleHeaderAccent.Render("wwlog")
+	title := styleHeaderBadge.Render("wwlog")
+	gap1 := lipgloss.NewStyle().Background(colorPanel).Render(" ")
 
 	var tabParts strings.Builder
 	for i, name := range tabNames {
@@ -460,7 +504,7 @@ func (m Model) headerView() string {
 	}
 
 	dateRange := styleHeader.Render(m.start + " → " + m.end)
-	left := lipgloss.JoinHorizontal(lipgloss.Center, title, styleHeader.Render(" · "), tabParts.String())
+	left := lipgloss.JoinHorizontal(lipgloss.Center, title, gap1, tabParts.String())
 	gap := max(0, m.width-lipgloss.Width(left)-lipgloss.Width(dateRange))
 	return lipgloss.NewStyle().
 		Background(colorPanel).
@@ -468,15 +512,23 @@ func (m Model) headerView() string {
 		Render(left + strings.Repeat(" ", gap) + dateRange)
 }
 
+// headerTabsOffset returns how many columns from the left edge the tab strip
+// starts — the app badge plus the single-column gap after it. headerView
+// and tabAtPoint both derive the tab strip's position from this one
+// function so their notions of "where the tabs are" cannot drift apart (see
+// the v1.14.0 dateRowAtPoint off-by-2 bug this pattern is meant to avoid).
+func headerTabsOffset() int {
+	return lipgloss.Width(styleHeaderBadge.Render("wwlog")) + 1
+}
+
 // tabAtPoint returns the tab index at the given (x, y) terminal coordinate,
 // or false if the point is not on a tab. The header is on row 0 and the tab
-// strip starts after the "wwlog · " prefix.
+// strip starts after the app badge (see headerTabsOffset).
 func (m Model) tabAtPoint(x, y int) (int, bool) {
 	if y != 0 {
 		return 0, false
 	}
-	cur := lipgloss.Width(styleHeaderAccent.Render("wwlog")) +
-		lipgloss.Width(styleHeader.Render(" · "))
+	cur := headerTabsOffset()
 	for i, name := range tabNames {
 		var w int
 		if tab(i) == m.activeTab {
@@ -492,52 +544,30 @@ func (m Model) tabAtPoint(x, y int) (int, bool) {
 	return 0, false
 }
 
-// detailFocused reports whether the active tab's detail pane currently has
-// keyboard focus (see keys.FocusPrev/FocusNext). Insights has no list pane
-// — its viewport always takes Up/Down directly — so it is never "focused"
-// in this sense.
-func (m Model) detailFocused() bool {
-	switch m.activeTab {
-	case tabLog:
-		return m.logModel.detailFocused
-	case tabNutrition:
-		return m.nutriModel.detailFocused
-	}
-	return false
-}
-
 func (m Model) statusView() string {
-	if m.statusMsg != "" {
-		return styleStatusBar.Width(m.width).Render(m.statusMsg)
-	}
-	var hints []string
-	switch m.activeTab {
-	case tabLog, tabNutrition:
-		if m.detailFocused() {
-			hints = append(hints, styleStatusKey.Render("↑/↓")+" scroll detail")
-		} else {
-			hints = append(hints, styleStatusKey.Render("↑/↓")+" navigate")
+	// A pending notification (export result, load notice) takes over the
+	// whole bar as a solid-colour strip — unmissable, the way glow's
+	// "Copied contents" bar is — rather than blending into the hint text.
+	if m.statusKind != statusNone && m.statusMsg != "" {
+		bar := styleNotifyInfo
+		switch m.statusKind {
+		case statusSuccess:
+			bar = styleNotifySuccess
+		case statusError:
+			bar = styleNotifyError
 		}
-		hints = append(hints,
-			styleStatusKey.Render("←/→")+" focus pane",
-			styleStatusKey.Render("/")+" filter",
-		)
-		if m.activeTab == tabLog {
-			hints = append(hints, styleStatusKey.Render("s")+" sort")
-		}
-	case tabInsights:
-		hints = append(hints,
-			styleStatusKey.Render("↑/↓")+" scroll",
-			styleStatusKey.Render("pgup/pgdn")+" page",
-		)
+		badge := styleHeaderBadge.Render("wwlog")
+		contentWidth := max(0, m.width-lipgloss.Width(badge))
+		return badge + bar.Width(contentWidth).Render(m.statusMsg)
 	}
-	hints = append(hints,
-		styleStatusKey.Render("r")+" range",
-		styleStatusKey.Render("e")+" export",
-		styleStatusKey.Render("tab")+" switch",
-		styleStatusKey.Render("q")+" quit",
-	)
-	left := strings.Join(hints, "  ")
+
+	var left string
+	if m.helpOpen {
+		left = styleStatusKey.Render("esc/?") + " close"
+	} else {
+		hkm := helpKeyMap{activeTab: m.activeTab}
+		left = newHelpModel().ShortHelpView(hkm.ShortHelp())
+	}
 
 	var right string
 	currentNorm := strings.TrimPrefix(m.version, "v")

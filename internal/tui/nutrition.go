@@ -216,6 +216,26 @@ func (m nutriModel) update(msg tea.Msg) (nutriModel, tea.Cmd) {
 			case key.Matches(msg, keys.ScrollDown):
 				m.detail.ScrollDown(detailScrollStep)
 				return m, nil
+			// See logModel's identical guard: these keys belong to the date
+			// list's own paging unless the detail pane has focus.
+			case m.detailFocused && key.Matches(msg, keys.GotoTop):
+				m.detail.GotoTop()
+				return m, nil
+			case m.detailFocused && key.Matches(msg, keys.GotoBottom):
+				m.detail.GotoBottom()
+				return m, nil
+			case m.detailFocused && key.Matches(msg, keys.PageUp):
+				m.detail.PageUp()
+				return m, nil
+			case m.detailFocused && key.Matches(msg, keys.PageDown):
+				m.detail.PageDown()
+				return m, nil
+			case m.detailFocused && key.Matches(msg, keys.HalfPageUp):
+				m.detail.HalfPageUp()
+				return m, nil
+			case m.detailFocused && key.Matches(msg, keys.HalfPageDown):
+				m.detail.HalfPageDown()
+				return m, nil
 			}
 		}
 	}
