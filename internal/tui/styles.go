@@ -211,4 +211,13 @@ var (
 	styleDialogHint = lipgloss.NewStyle().
 			Foreground(colorMuted).
 			Background(colorPanel)
+
+	// Exit banner styles — printed to the plain terminal after the TUI has
+	// exited (alt-screen already torn down), so no Background is set here.
+	styleExitMessage = lipgloss.NewStyle().
+				Foreground(colorText).
+				Bold(true)
+
+	styleExitByline = lipgloss.NewStyle().
+			Foreground(colorSteel)
 )

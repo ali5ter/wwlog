@@ -2,7 +2,6 @@ package tui
 
 import (
 	"fmt"
-	"strings"
 	"time"
 
 	"charm.land/bubbles/v2/spinner"
@@ -11,11 +10,6 @@ import (
 	"charm.land/lipgloss/v2"
 	"github.com/ali5ter/wwlog/internal/auth"
 )
-
-const asciiLogo = `
- ╦ ╦ ╦ ╦ ╦   ╔═╗ ╔═╗
- ║║║ ║║║ ║   ║ ║ ║ ╦
- ╚╩╝ ╚╩╝ ╩═╝ ╚═╝ ╚═╝`
 
 type splashPhase int
 
@@ -206,24 +200,6 @@ func (m splashModel) update(msg tea.Msg) (splashModel, tea.Cmd) {
 	return m, cmd
 }
 
-// renderGradientLogo renders the splash ASCII logo with a smooth RGB gradient
-// interpolated line-by-line from colorTeal (Turtle) at the top to
-// colorPurple (Violet) at the bottom.
-func renderGradientLogo() string {
-	lines := strings.Split(strings.TrimLeft(asciiLogo, "\n"), "\n")
-	n := len(lines) - 1
-	if n < 1 {
-		n = 1
-	}
-	rendered := make([]string, len(lines))
-	for i, line := range lines {
-		t := float64(i) / float64(n)
-		c := lerpColor(colorTeal, colorPurple, t)
-		rendered[i] = lipgloss.NewStyle().Foreground(c).Bold(true).Render(line)
-	}
-	return strings.Join(rendered, "\n")
-}
-
 func (m splashModel) view() string {
 	var title, body, hint string
 	switch m.phase {
@@ -251,13 +227,13 @@ func (m splashModel) view() string {
 	return splashFrame(renderDialog(title, body, hint), m.width, m.height)
 }
 
-// splashFrame renders the wwlog gradient logo above the given dialog, centred
-// in the available terminal area. Used by the splash phases and by the
-// initial-load loading view so the logo persists across the entire pre-TUI
-// experience.
+// splashFrame renders the wwlog logo (logo.go) above the given dialog,
+// centred in the available terminal area. Used by the splash phases and by
+// the initial-load loading view so the logo persists across the entire
+// pre-TUI experience.
 func splashFrame(dialog string, width, height int) string {
 	content := lipgloss.JoinVertical(lipgloss.Center,
-		renderGradientLogo(),
+		cfontsLogo,
 		"",
 		dialog,
 	)

@@ -115,6 +115,9 @@ func Run(authObj *auth.Auth, tld, weightUnit string, ds api.DayStore, targets *c
 
 	p := tea.NewProgram(m)
 	_, err := p.Run()
+	if err == nil {
+		printExitBanner()
+	}
 	return err
 }
 
