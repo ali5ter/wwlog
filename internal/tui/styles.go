@@ -42,6 +42,9 @@ func newDateList(items []list.Item, width, height int) list.Model {
 }
 
 func truncate(s string, max int) string {
+	if max <= 0 {
+		return ""
+	}
 	r := []rune(s)
 	if len(r) <= max {
 		return s
