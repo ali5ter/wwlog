@@ -207,8 +207,8 @@ func (m splashModel) update(msg tea.Msg) (splashModel, tea.Cmd) {
 }
 
 // renderGradientLogo renders the splash ASCII logo with a smooth RGB gradient
-// interpolated line-by-line from teal (#00B388) at the top to purple
-// (#6B4C9A) at the bottom.
+// interpolated line-by-line from colorTeal (Turtle) at the top to
+// colorPurple (Violet) at the bottom.
 func renderGradientLogo() string {
 	lines := strings.Split(strings.TrimLeft(asciiLogo, "\n"), "\n")
 	n := len(lines) - 1
@@ -309,18 +309,23 @@ func (m dateRangeModel) view() string {
 	return renderDialog("Change date range", body, "esc cancel · enter submit · tab next field")
 }
 
-// wwHuhTheme is a huh.Theme styled with the WW colour palette.
+// wwHuhTheme is a huh.Theme styled with the app's colour palette (styles.go)
+// rather than one of huh's own built-in themes.
 type wwHuhTheme struct{}
 
 func (wwHuhTheme) Theme(isDark bool) *huh.Styles {
 	t := huh.ThemeCharm(isDark)
 
-	teal := lipgloss.Color("#00B388")
-	purple := lipgloss.Color("#6B4C9A")
-	steel := lipgloss.Color("#7f93a6")
-	muted := lipgloss.Color("#a8b6c0")
-	panel := lipgloss.Color("#161d24")
-	text := lipgloss.Color("#e9eff3")
+	// Local aliases only to keep the style definitions below terse — these
+	// are the same package-level vars styles.go defines, not a separate
+	// copy. Previously this function held its own hardcoded hex literals,
+	// which had drifted out of sync with styles.go without anyone noticing.
+	teal := colorTeal
+	purple := colorPurple
+	steel := colorSteel
+	muted := colorMuted
+	panel := colorPanel
+	text := colorText
 
 	// Every style below carries an explicit Background(panel), even the
 	// ones that only ever render a short marker string. huh.ThemeCharm's

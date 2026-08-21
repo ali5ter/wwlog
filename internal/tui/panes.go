@@ -20,18 +20,19 @@ const (
 	detailScrollStep = 3
 )
 
-// paneBox wraps content in a focus-aware rounded box — colorTeal border
+// paneBox wraps content in a focus-aware rounded box — colorPurple border
 // when this pane has keyboard focus, colorLine otherwise — so which pane
 // (date list or detail) currently receives up/down is always visually
 // unambiguous. Mirrors styleDialogBox's established RoundedBorder
 // convention (export/range dialogs) rather than introducing a new visual
-// language. Deliberately not colorPurple and no Background: a list's own
-// selected row already uses colorTeal (see newDateList's SelectedTitle),
-// but a box outline reads as a distinct signal from a single row's accent.
+// language. Matches colorPurple deliberately: a list's own selected row
+// also uses colorPurple (see newDateList's SelectedTitle) — selection and
+// focus share one "you are here" colour, distinct from colorTeal's general
+// brand/chrome role (badges, tabs, gauges).
 func paneBox(content string, outerWidth, outerHeight int, focused bool) string {
 	c := colorLine
 	if focused {
-		c = colorTeal
+		c = colorPurple
 	}
 	return lipgloss.NewStyle().
 		Width(outerWidth).

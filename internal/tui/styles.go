@@ -17,8 +17,8 @@ func newDateList(items []list.Item, width, height int) list.Model {
 	del.Styles.NormalDesc = del.Styles.NormalTitle.Foreground(colorMuted)
 	del.Styles.SelectedTitle = lipgloss.NewStyle().
 		Border(lipgloss.NormalBorder(), false, false, false, true).
-		BorderForeground(colorTeal).
-		Foreground(colorTeal).
+		BorderForeground(colorPurple).
+		Foreground(colorPurple).
 		Padding(0, 0, 0, 1)
 	del.Styles.SelectedDesc = del.Styles.SelectedTitle.Foreground(colorMuted)
 
@@ -60,10 +60,12 @@ func lerpColor(a, b color.Color, t float64) color.Color {
 	return lipgloss.Color(fmt.Sprintf("#%02X%02X%02X", lerp(ar, br), lerp(ag, bg), lerp(ab, bb)))
 }
 
-// WW-inspired colour palette.
+// CharmTone-derived colour palette (replaces the earlier WW-branded one).
+// colorTeal is CharmTone Turtle, colorPurple is CharmTone Violet — see
+// https://github.com/charmbracelet/x/blob/main/exp/charmtone/charmtone.go.
 var (
-	colorTeal   = lipgloss.Color("#00B388") // WW signature green — active, selected, accents
-	colorPurple = lipgloss.Color("#6B4C9A") // WW app purple — prompts, pointers
+	colorTeal   = lipgloss.Color("#0ADCD9") // Turtle — brand/chrome: badges, tabs, gauges, accents
+	colorPurple = lipgloss.Color("#C259FF") // Violet — selection, focus, prompts, over-budget warning
 	colorSteel  = lipgloss.Color("#7f93a6") // Secondary text, metadata, labels
 	colorMuted  = lipgloss.Color("#a8b6c0") // Inactive items, borders, dim elements
 	colorText   = lipgloss.Color("#e9eff3") // Primary text
