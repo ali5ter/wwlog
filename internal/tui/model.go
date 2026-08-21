@@ -457,7 +457,7 @@ func (m Model) viewContent() string {
 	// (see the key handler in Update) — so checking it first is safe.
 	if m.helpOpen {
 		hkm := helpKeyMap{activeTab: m.activeTab}
-		return overlayDialog(main, helpPanel(hkm, m.width), m.width, m.height)
+		return overlayDialog(main, helpPanel(hkm), m.width, m.height)
 	}
 
 	// If a dialog is active, composite it on top of the main TUI. The Lipgloss
@@ -506,10 +506,14 @@ func (m Model) headerView() string {
 	dateRange := styleHeader.Render(m.start + " → " + m.end)
 	left := lipgloss.JoinHorizontal(lipgloss.Center, title, gap1, tabParts.String())
 	gap := max(0, m.width-lipgloss.Width(left)-lipgloss.Width(dateRange))
-	return lipgloss.NewStyle().
-		Background(colorPanel).
-		Width(m.width).
-		Render(left + strings.Repeat(" ", gap) + dateRange)
+	// The gap-fill is its own Background(colorPanel)-styled fragment,
+	// concatenated rather than re-rendered through an enclosing style: left
+	// and dateRange each end with their own style's reset, and wrapping
+	// already-reset content in one more outer Style.Render() call doesn't
+	// restore a background that a reset already killed mid-line — see the
+	// note on renderShortHelp (help.go) for the general case of this bug.
+	fill := lipgloss.NewStyle().Background(colorPanel).Render(strings.Repeat(" ", gap))
+	return left + fill + dateRange
 }
 
 // headerTabsOffset returns how many columns from the left edge the tab strip
@@ -563,10 +567,11 @@ func (m Model) statusView() string {
 
 	var left string
 	if m.helpOpen {
-		left = styleStatusKey.Render("esc/?") + " close"
+		left = styleStatusKey.Render("esc/?") +
+			lipgloss.NewStyle().Background(colorPanel).Foreground(colorMuted).Render(" close")
 	} else {
 		hkm := helpKeyMap{activeTab: m.activeTab}
-		left = newHelpModel().ShortHelpView(hkm.ShortHelp())
+		left = renderShortHelp(hkm.ShortHelp())
 	}
 
 	var right string
@@ -586,7 +591,12 @@ func (m Model) statusView() string {
 	if gap < 1 {
 		gap = 1
 	}
-	return styleStatusBar.Width(m.width).Render(left + strings.Repeat(" ", gap) + right)
+	// The gap-fill needs its own Background(colorPanel) — see the note on
+	// headerView's identical fill above. styleStatusBar.Render() further
+	// out is still safe: Width()/Padding() only add cells at the very
+	// start/end of the block, never mid-line.
+	fill := lipgloss.NewStyle().Background(colorPanel).Render(strings.Repeat(" ", gap))
+	return styleStatusBar.Width(m.width).Render(left + fill + right)
 }
 
 func (m Model) contentView() string {

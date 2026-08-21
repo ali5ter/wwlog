@@ -322,36 +322,46 @@ func (wwHuhTheme) Theme(isDark bool) *huh.Styles {
 	panel := lipgloss.Color("#161d24")
 	text := lipgloss.Color("#e9eff3")
 
-	t.Focused.Base = t.Focused.Base.BorderForeground(teal)
+	// Every style below carries an explicit Background(panel), even the
+	// ones that only ever render a short marker string. huh.ThemeCharm's
+	// own styles are foreground-only; a style with no Background ends its
+	// Render() with a full ANSI reset, which drops the background back to
+	// the terminal default for anything after it on that line — including
+	// the field's own trailing width-padding, rendered by a separate
+	// Style.Render() call. The visible symptom is a black rectangle
+	// wherever a shorter field trails off before the dialog's declared
+	// width. Same root cause dialog.go's renderDialog already documents;
+	// huh's per-field styles just weren't covered by that fix.
+	t.Focused.Base = t.Focused.Base.BorderForeground(teal).Background(panel)
 	t.Focused.Card = t.Focused.Base
-	t.Focused.Title = lipgloss.NewStyle().Foreground(teal).Bold(true)
-	t.Focused.Description = lipgloss.NewStyle().Foreground(steel)
-	t.Focused.ErrorIndicator = lipgloss.NewStyle().Foreground(purple)
-	t.Focused.ErrorMessage = lipgloss.NewStyle().Foreground(purple)
-	t.Focused.SelectSelector = lipgloss.NewStyle().Foreground(teal).SetString("> ")
-	t.Focused.NextIndicator = lipgloss.NewStyle().Foreground(teal).SetString("→")
+	t.Focused.Title = lipgloss.NewStyle().Background(panel).Foreground(teal).Bold(true)
+	t.Focused.Description = lipgloss.NewStyle().Background(panel).Foreground(steel)
+	t.Focused.ErrorIndicator = lipgloss.NewStyle().Background(panel).Foreground(purple)
+	t.Focused.ErrorMessage = lipgloss.NewStyle().Background(panel).Foreground(purple)
+	t.Focused.SelectSelector = lipgloss.NewStyle().Background(panel).Foreground(teal).SetString("> ")
+	t.Focused.NextIndicator = lipgloss.NewStyle().Background(panel).Foreground(teal).SetString("→")
 	t.Focused.FocusedButton = lipgloss.NewStyle().
 		Foreground(panel).Background(teal).Bold(true).
 		Padding(0, 3).MarginRight(1)
 	t.Focused.BlurredButton = lipgloss.NewStyle().
 		Foreground(muted).Background(panel).
 		Padding(0, 3).MarginRight(1)
-	t.Focused.TextInput.Cursor = lipgloss.NewStyle().Foreground(teal)
+	t.Focused.TextInput.Cursor = lipgloss.NewStyle().Background(panel).Foreground(teal)
 	t.Focused.TextInput.CursorText = lipgloss.NewStyle().Foreground(panel).Background(teal)
-	t.Focused.TextInput.Placeholder = lipgloss.NewStyle().Foreground(muted)
-	t.Focused.TextInput.Prompt = lipgloss.NewStyle().Foreground(purple)
-	t.Focused.TextInput.Text = lipgloss.NewStyle().Foreground(text)
+	t.Focused.TextInput.Placeholder = lipgloss.NewStyle().Background(panel).Foreground(muted)
+	t.Focused.TextInput.Prompt = lipgloss.NewStyle().Background(panel).Foreground(purple)
+	t.Focused.TextInput.Text = lipgloss.NewStyle().Background(panel).Foreground(text)
 
 	t.Blurred = t.Focused
 	t.Blurred.Base = t.Focused.Base.BorderStyle(lipgloss.HiddenBorder())
 	t.Blurred.Card = t.Blurred.Base
-	t.Blurred.Title = lipgloss.NewStyle().Foreground(steel)
-	t.Blurred.TextInput.Text = lipgloss.NewStyle().Foreground(muted)
-	t.Blurred.NextIndicator = lipgloss.NewStyle()
-	t.Blurred.PrevIndicator = lipgloss.NewStyle()
+	t.Blurred.Title = lipgloss.NewStyle().Background(panel).Foreground(steel)
+	t.Blurred.TextInput.Text = lipgloss.NewStyle().Background(panel).Foreground(muted)
+	t.Blurred.NextIndicator = lipgloss.NewStyle().Background(panel)
+	t.Blurred.PrevIndicator = lipgloss.NewStyle().Background(panel)
 
-	t.Group.Title = lipgloss.NewStyle().Foreground(teal).Bold(true)
-	t.Group.Description = lipgloss.NewStyle().Foreground(steel)
+	t.Group.Title = lipgloss.NewStyle().Background(panel).Foreground(teal).Bold(true)
+	t.Group.Description = lipgloss.NewStyle().Background(panel).Foreground(steel)
 
 	return t
 }

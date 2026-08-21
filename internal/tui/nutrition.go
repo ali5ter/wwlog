@@ -590,21 +590,41 @@ func makeBar(value, max float64, width int, clamp bool) string {
 	full := eighths / 8
 	rem := eighths % 8
 
-	barColor := color.Color(colorTeal)
-	if !clamp && max > 0 && value > max {
-		barColor = colorPurple
-	}
-
-	fillStyle := lipgloss.NewStyle().Foreground(barColor)
+	// Over budget gets a single solid warning color rather than the
+	// gradient: the gradient's own far end is already colorPurple, so a
+	// merely-full bar and a genuinely over-limit one would otherwise look
+	// identical — the one signal WW points/nutrition budgets need to keep.
+	over := !clamp && max > 0 && value > max
+	overStyle := lipgloss.NewStyle().Foreground(colorPurple)
 	markerStyle := lipgloss.NewStyle().Foreground(colorLine)
 
+	// cellColor returns the fill color for the cell at position i of width
+	// — a gradient from colorTeal at the start of the bar to colorPurple at
+	// its far (max) end, so how much of the spectrum is visible reflects
+	// how full the bar is, not just a single flat fill color.
+	cellColor := func(i int) color.Color {
+		t := 0.0
+		if width > 1 {
+			t = float64(i) / float64(width-1)
+		}
+		return lerpColor(colorTeal, colorPurple, t)
+	}
+
 	var b strings.Builder
-	if full > 0 {
-		b.WriteString(fillStyle.Render(strings.Repeat("█", full)))
+	for i := 0; i < full; i++ {
+		style := overStyle
+		if !over {
+			style = lipgloss.NewStyle().Foreground(cellColor(i))
+		}
+		b.WriteString(style.Render("█"))
 	}
 	emptyCells := width - full
 	if rem > 0 && emptyCells > 0 {
-		b.WriteString(fillStyle.Render(string(subcellBlocks[rem])))
+		style := overStyle
+		if !over {
+			style = lipgloss.NewStyle().Foreground(cellColor(full))
+		}
+		b.WriteString(style.Render(string(subcellBlocks[rem])))
 		emptyCells--
 	}
 	if emptyCells > 0 {
