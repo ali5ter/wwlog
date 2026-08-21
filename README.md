@@ -17,12 +17,12 @@ viewing insights, plus a pipeline mode for scripting and file export.
   subscription changes, API windows, and app discontinuations
 - **Offline mode** — browse, report, and export from your local archive with no
   network calls required
-- **Log tab** — day-by-day food log with a points bar, meal breakdown, and per-entry kcal;
-  filter by date and sort entries by points or calories
-- **Nutrition tab** — nutrient bars vs. recommended daily values, per-day averages,
-  and trend charts for calories, protein, carbs, and fat across the selected range
 - **Insights tab** — a calendar heatmap of daily points budget, range summary,
   points by meal, macro distribution, top foods by points, and a zero-point food log
+- **Nutrition tab** — nutrient bars vs. recommended daily values, per-day averages,
+  and trend charts for calories, protein, carbs, and fat across the selected range
+- **Log tab** — day-by-day food log with a points bar, meal breakdown, and per-entry kcal;
+  filter by date and sort entries by points or calories
 - **Pipeline mode** — `--json`, `--report`, and `--export` flags for scripting and file output
 - **No DevTools required** — one `--login` step stores credentials in your system keychain
 

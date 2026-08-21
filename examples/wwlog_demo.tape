@@ -33,7 +33,44 @@ Enter
 # Loading 30 days from the API
 Sleep 4s
 
+# ── Insights tab (default on launch) ────────────────────────────
+Sleep 1300ms
+PageDown
+Sleep 1800ms
+PageUp
+Sleep 1300ms
+
+# ── Nutrition tab ─────────────────────────────────────────────
+Tab
+Sleep 800ms
+Down
+Sleep 500ms
+Down
+Sleep 500ms
+Down
+Sleep 800ms
+
+# Focus the detail pane and scroll past the nutrient bars into the
+# Carbs/Fat trend charts below the fold
+Right
+Sleep 700ms
+Down
+Sleep 300ms
+Down
+Sleep 300ms
+Down
+Sleep 300ms
+Down
+Sleep 300ms
+Down
+Sleep 300ms
+Down
+Sleep 900ms
+Left
+Sleep 500ms
+
 # ── Log tab ──────────────────────────────────────────────────
+Tab
 Sleep 800ms
 Down
 Sleep 500ms
@@ -82,43 +119,6 @@ Backspace
 Sleep 100ms
 Enter
 Sleep 500ms
-
-# ── Nutrition tab ─────────────────────────────────────────────
-Tab
-Sleep 800ms
-Down
-Sleep 500ms
-Down
-Sleep 500ms
-Down
-Sleep 800ms
-
-# Focus the detail pane and scroll past the nutrient bars into the
-# Carbs/Fat trend charts below the fold
-Right
-Sleep 700ms
-Down
-Sleep 300ms
-Down
-Sleep 300ms
-Down
-Sleep 300ms
-Down
-Sleep 300ms
-Down
-Sleep 300ms
-Down
-Sleep 900ms
-Left
-Sleep 500ms
-
-# ── Insights tab ─────────────────────────────────────────────
-Tab
-Sleep 1300ms
-PageDown
-Sleep 1800ms
-PageUp
-Sleep 1300ms
 
 # ── Export dialog ─────────────────────────────────────────────
 Type "e"

@@ -46,9 +46,9 @@ func TestHelpKeyMapFullHelp(t *testing.T) {
 		wantHasSort   bool
 		wantHasFocus  bool
 	}{
-		{"log", tabLog, true, true, true},
-		{"nutrition", tabNutrition, true, false, true},
 		{"insights", tabInsights, false, false, false},
+		{"nutrition", tabNutrition, true, false, true},
+		{"log", tabLog, true, true, true},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
@@ -76,7 +76,7 @@ func TestHelpKeyMapFullHelp(t *testing.T) {
 // click hit-test drifting apart — the same class of bug v1.14.0 fixed in
 // dateRowAtPoint (see panes.go).
 func TestHeaderTabsOffsetMatchesTabAtPoint(t *testing.T) {
-	m := Model{width: 100, activeTab: tabLog}
+	m := Model{width: 100, activeTab: tabInsights}
 	offset := headerTabsOffset()
 
 	if _, ok := m.tabAtPoint(offset-1, 0); ok {
@@ -93,11 +93,12 @@ func newTestModel() Model {
 	logs := []*api.DayLog{manyEntriesLog("2026-06-10")}
 	loc := newLocale("com", "")
 	return Model{
-		screen:   screenLog,
-		width:    100,
-		height:   30,
-		logs:     logs,
-		logModel: newLogModel(logs, 100, 24, loc),
+		screen:    screenLog,
+		activeTab: tabLog,
+		width:     100,
+		height:    30,
+		logs:      logs,
+		logModel:  newLogModel(logs, 100, 24, loc),
 	}
 }
 
