@@ -34,12 +34,12 @@ const (
 type tab int
 
 const (
-	tabLog tab = iota
+	tabInsights tab = iota
 	tabNutrition
-	tabInsights
+	tabLog
 )
 
-var tabNames = []string{"Log", "Nutrition", "Insights"}
+var tabNames = []string{"Insights", "Nutrition", "Log"}
 
 type dataMsg struct {
 	logs    []*api.DayLog
@@ -102,8 +102,10 @@ func Run(authObj *auth.Auth, tld, weightUnit string, ds api.DayStore, targets *c
 	s.Style = lipgloss.NewStyle().Foreground(colorTeal)
 
 	m := Model{
-		spinner:     s,
-		screen:      screenSplash,
+		spinner: s,
+		screen:  screenSplash,
+		// activeTab is left at its zero value, tabInsights — the TUI leads
+		// with the Insights tab on launch.
 		splashModel: newSplashModel(authObj, version, preStart, preEnd),
 		authObj:     authObj,
 		tld:         tld,
